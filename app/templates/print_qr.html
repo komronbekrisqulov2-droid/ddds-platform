@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <title>Stol QR Stendi: {{ room.room_name }} - DDDS Cloud</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #e2e8f0;
+            color: #0f172a;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* Printable A4 Page */
+        .a4-sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            background: #ffffff;
+            padding: 16mm 20mm;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        @media print {
+            body {
+                background: none;
+            }
+            .a4-sheet {
+                margin: 0;
+                box-shadow: none;
+                width: 100%;
+                min-height: 100vh;
+                padding: 14mm 18mm;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* Stand Fold Guidelines */
+        .fold-guide-top {
+            border-bottom: 2px dashed #94a3b8;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .fold-guide-bottom {
+            border-top: 2px dashed #94a3b8;
+            padding-top: 8px;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Header Branding */
+        .stand-header {
+            text-align: center;
+            border-bottom: 3px solid #0284c7;
+            padding-bottom: 16px;
+        }
+        .university-badge {
+            display: inline-block;
+            background: #0f172a;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 13px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .room-title {
+            font-size: 32px;
+            font-weight: 900;
+            color: #0f172a;
+            letter-spacing: -0.5px;
+        }
+        .room-sub {
+            font-size: 15px;
+            color: #475569;
+            margin-top: 4px;
+        }
+
+        /* Center QR Code Section */
+        .qr-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 24px 0;
+            text-align: center;
+        }
+        .qr-frame {
+            padding: 16px;
+            border: 4px solid #0f172a;
+            border-radius: 24px;
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            margin-bottom: 16px;
+        }
+        .qr-frame img {
+            width: 220px;
+            height: 220px;
+            display: block;
+        }
+
+        /* PIN Display */
+        .pin-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: #f1f5f9;
+            border: 2px solid #cbd5e1;
+            padding: 10px 24px;
+            border-radius: 14px;
+        }
+        .pin-label {
+            font-size: 15px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+        }
+        .pin-digits {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 6px;
+            color: #0284c7;
+            font-family: monospace;
+        }
+
+        /* Instructions 3 Steps */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .step-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+        .step-num {
+            width: 32px;
+            height: 32px;
+            background: #0284c7;
+            color: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 14px;
+            margin: 0 auto 8px auto;
+        }
+        .step-title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .step-desc {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.4;
+        }
+
+        /* Footer Stand Info */
+        .stand-footer {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* Action Toolbar for screen */
+        .print-toolbar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        .btn-print {
+            background: #0284c7;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .btn-print:hover {
+            background: #0369a1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="print-toolbar no-print">
+        <button class="btn-print" onclick="window.print()">🖨 A4 Stendni Chop Etish (Print)</button>
+        <button class="btn-print" style="background: #334155;" onclick="window.history.back()">Ortga</button>
+    </div>
+
+    <div class="a4-sheet">
+        <!-- Fold top guide -->
+        <div class="fold-guide-top">
+            ✂️ Kesish yoki Buklash chizig'i (Stol stendining yuqori qirrasi) ✂️
+        </div>
+
+        <!-- Stand Header -->
+        <div class="stand-header">
+            <div class="university-badge">DDDS Cloud • Distributed Dual-Display Smart Classroom</div>
+            <h1 class="room-title">{{ room.room_name }}</h1>
+            <p class="room-sub">O'qituvchi stoli uchun simsiz masofaviy boshqaruv stendi</p>
+        </div>
+
+        <!-- Center QR Section -->
+        <div class="qr-section">
+            <div class="qr-frame">
+                <img src="{{ qr_data_uri }}" alt="Room QR Code">
+            </div>
+
+            <div class="pin-container">
+                <span class="pin-label">PIN-KOD:</span>
+                <span class="pin-digits">{{ room.pin }}</span>
+            </div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
+                Havola: <strong>{{ join_url }}</strong>
+            </div>
+        </div>
+
+        <!-- Instructions 3 Steps -->
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-num">1</div>
+                <div class="step-title">Kamera bilan Skanerlang</div>
+                <div class="step-desc">Smartfon kamerangizni QR-kodga qarating. Hech qanday dastur o'rnatish shart emas.</div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">2</div>
+                <div class="step-title">PIN-Kodni Kiriting</div>
+                <div class="step-desc">Xavfsiz ulanish uchun stenddagi 4 xonali PIN-kodni kiritib tasdiqlang.</div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">3</div>
+                <div class="step-title">Erkin Boshqaring</div>
+                <div class="step-desc">Slaydlarni almashtiring, lazer ko'rsatgich bilan ko'rsating va ma'ruzachi eslatmalarini o'qing.</div>
+            </div>
+        </div>
+
+        <!-- Stand Footer -->
+        <div class="stand-footer">
+            <span>DDDS Cloud v2.0 • Zero-Install & Zero-Friction Classroom Solution</span>
+            <span>Xona ID: {{ room.room_id }} • 100% Veb-brauzer</span>
+        </div>
+
+        <!-- Fold bottom guide -->
+        <div class="fold-guide-bottom">
+            ✂️ Buklash chizig'i (Stol ustiga A-shaklida stend qilish uchun) ✂️
+        </div>
+    </div>
+
+</body>
+</html>
+

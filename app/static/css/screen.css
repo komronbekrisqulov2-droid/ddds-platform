@@ -1,0 +1,281 @@
+/* DDDS Cloud - Smart Monitor Kiosk Display Stylesheet */
+html, body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #000000;
+}
+
+#kiosk-viewport {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #0b0f19;
+}
+
+/* Slide Image Viewer */
+.slide-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.25s ease-in-out;
+}
+.slide-layer img {
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background-color: #0b0f19;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: high-quality;
+}
+
+/* Synchronized Video Layer */
+.video-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    display: none;
+    z-index: 10;
+}
+.video-layer video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* WebRTC Live Screen Sharing Layer */
+.screenshare-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    display: none;
+    z-index: 15;
+}
+.screenshare-layer video,
+.screenshare-layer canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    background-color: #000;
+}
+
+/* Screenshare connecting loader */
+.screenshare-loader {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, #0b1329 0%, #030712 100%);
+    color: #94a3b8;
+    z-index: 5;
+    gap: 18px;
+    font-family: inherit;
+}
+.screenshare-loader .loader-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3.5px solid rgba(59, 130, 246, 0.2);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin-screenshare-loader 0.8s linear infinite;
+}
+@keyframes spin-screenshare-loader {
+    to { transform: rotate(360deg); }
+}
+.screenshare-loader .loader-text {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #f1f5f9;
+    letter-spacing: 0.5px;
+}
+
+/* Whiteboard background styles */
+.whiteboard-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    z-index: 5;
+}
+.whiteboard-layer.theme-grid {
+    background-color: #0f172a;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+.whiteboard-layer.theme-white {
+    background-color: #ffffff;
+}
+
+/* Drawing Canvas Layer */
+#annotation-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 25;
+    pointer-events: none; /* Managed dynamically via toolbar */
+}
+
+/* Full Blackout Overlay */
+#blackout-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000000;
+    z-index: 99999;
+    display: none;
+}
+
+/* Discrete Screen Status Pill */
+.screen-header-badge {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    z-index: 30;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    transition: opacity 0.4s ease;
+    opacity: 0.8;
+}
+.screen-header-badge:hover {
+    opacity: 1;
+}
+
+/* Floating Smart Board Toolbar */
+.floating-smart-toolbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(19, 27, 46, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-full);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.floating-smart-toolbar.autohide {
+    transform: translateX(-50%) translateY(140px);
+    opacity: 0;
+    pointer-events: none;
+}
+.floating-smart-toolbar.autohide:hover {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#toolbar-reveal-handle {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 35;
+    width: 64px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 9px;
+    opacity: 0;
+    transition: opacity 0.3s ease, height 0.2s ease;
+}
+#toolbar-reveal-handle:hover {
+    opacity: 1;
+    height: 18px;
+    background: var(--primary);
+    color: white;
+}
+
+.tool-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+.tool-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.tool-btn.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 0 14px var(--primary-glow);
+}
+
+/* Quick Announcement Banner */
+#announcement-banner {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.95), rgba(59, 130, 246, 0.95));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 18px 36px;
+    border-radius: var(--radius-lg);
+    font-size: 1.5rem;
+    font-weight: 700;
+    z-index: 50000;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+    display: none;
+    animation: slideDown 0.4s ease;
+}
+@keyframes slideDown {
+    from { transform: translateX(-50%) translateY(-50px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+

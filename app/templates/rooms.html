@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}DDDS Cloud - Universitet Smart Auditoriyalari Boshqaruvi{% endblock %}
+
+{% block extra_css %}
+<style>
+.lobby-header {
+    background: linear-gradient(180deg, #131b2e 0%, #0b0f19 100%);
+    border-bottom: 1px solid var(--border-color);
+    padding: 32px 24px;
+    text-align: center;
+}
+.lobby-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+}
+.lobby-subtitle {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.rooms-container {
+    max-width: 1200px;
+    margin: 32px auto;
+    padding: 0 20px;
+}
+.rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 24px;
+    margin-top: 24px;
+}
+.room-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 18px;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.room-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-cyan);
+}
+.room-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.room-id-tag {
+    font-size: 0.8rem;
+    font-family: monospace;
+    color: var(--accent-cyan);
+    background: rgba(0, 210, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.room-name-text {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-top: 4px;
+}
+.room-desc {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    min-height: 40px;
+}
+
+.room-links-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.room-link-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.link-screen1 { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+.link-screen1:hover { background: rgba(59, 130, 246, 0.3); }
+.link-screen2 { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.3); }
+.link-screen2:hover { background: rgba(139, 92, 246, 0.3); }
+.link-admin { background: rgba(2, 132, 199, 0.25); color: #38bdf8; border: 1px solid var(--primary); }
+.link-admin:hover { background: var(--primary); color: white; }
+.link-remote { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid var(--accent-emerald); }
+.link-remote:hover { background: var(--accent-emerald); color: white; }
+
+.room-stand-btn {
+    grid-column: span 2;
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px dashed #475569;
+}
+.room-stand-btn:hover {
+    background: #334155;
+    border-color: #94a3b8;
+}
+
+.top-bar-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+/* Responsive design for Lobby */
+@media (max-width: 768px) {
+    .lobby-header {
+        padding: 24px 16px;
+    }
+    .lobby-title {
+        font-size: 1.6rem;
+    }
+    .lobby-subtitle {
+        font-size: 0.95rem;
+    }
+    .rooms-container {
+        padding: 0 14px;
+        margin: 18px auto;
+    }
+    .top-bar-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+    .top-bar-actions button {
+        width: 100%;
+    }
+    .rooms-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .room-links-grid {
+        grid-template-columns: 1fr;
+    }
+    .room-stand-btn {
+        grid-column: span 1;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<header class="lobby-header">
+    <h1 class="lobby-title">DDDS Cloud Platform</h1>
+    <p class="lobby-subtitle">
+        Taqsimlangan Ikkita Smart Monitor (Distributed Dual-Display) tizimi. Simlar va drayverlarsiz, 100% brauzerda real vaqt sinxron boshqaruv.
+    </p>
+</header>
+
+<main class="rooms-container">
+    <div class="top-bar-actions">
+        <h2>🏛 Faol Auditoriyalar Ro'yxati</h2>
+        <button class="btn btn-primary" onclick="openNewRoomModal()">+ Yangi Xona Ochish</button>
+    </div>
+
+    <!-- Live Instant Search Bar -->
+    <div style="margin: 14px 0 20px 0; display: flex; gap: 12px; align-items: center;">
+        <div style="flex: 1; position: relative;">
+            <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 1rem;">🔍</span>
+            <input type="text" id="room-search-input" placeholder="Auditoriya nomi yoki ID raqami bo'yicha qidirish (masalan: 204, fizika, 101)..." 
+                   style="width: 100%; padding: 12px 14px 12px 42px; background: #0c1427; border: 1px solid var(--border-color); border-radius: 10px; color: white; font-size: 0.92rem; outline: none; transition: border-color 0.2s;"
+                   onfocus="this.style.borderColor='var(--accent-cyan)'" onblur="this.style.borderColor='var(--border-color)'" oninput="filterRoomsList(this.value)">
+        </div>
+        <span class="badge badge-primary" id="rooms-count-badge" style="padding: 10px 14px; font-size: 0.82rem; flex-shrink: 0;">{{ rooms|length }} ta xona</span>
+    </div>
+
+    <div class="rooms-grid">
+        {% for room in rooms %}
+        <div class="room-card" id="room-card-{{ room.room_id }}">
+            <div>
+                <div class="room-card-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="room-id-tag">ID: {{ room.room_id }}</span>
+                        <span class="badge badge-primary">PIN: {{ room.pin }}</span>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="openEditRoomModal('{{ room.room_id }}', '{{ room.room_name|replace("'", "\\'") }}', '{{ room.pin }}', '{{ (room.description or "")|replace("'", "\\'") }}')" title="Xonani tahrirlash">
+                            ✏️ Tahrirlash
+                        </button>
+                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.8rem; color: #ef4444;" onclick="confirmDeleteRoom('{{ room.room_id }}', '{{ room.room_name|replace("'", "\\'") }}')" title="Xonani o'chirish">
+                            🗑️ O'chirish
+                        </button>
+                    </div>
+                </div>
+                <h3 class="room-name-text">{{ room.room_name }}</h3>
+                <p class="room-desc">{{ room.description or "Smart ta'lim va interaktiv dual displey auditoriyasi" }}</p>
+                <div style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 12px;">
+                    Slaydlar: {{ room.slides|length }} ta | Rejim: <strong>{{ room.display_mode.value|upper }}</strong>
+                </div>
+            </div>
+
+            <div class="room-links-grid">
+                <a href="/screen/{{ room.room_id }}/1" target="_blank" class="room-link-btn link-screen1" title="Kiosk rejimida chap smart monitorga ochiladi">
+                    🖥 1-Monitor (Chap)
+                </a>
+                <a href="/screen/{{ room.room_id }}/2" target="_blank" class="room-link-btn link-screen2" title="Kiosk rejimida o'ng smart monitorga ochiladi">
+                    🖥 2-Monitor (O'ng)
+                </a>
+                <a href="/admin/{{ room.room_id }}" class="room-link-btn link-admin" title="O'qituvchi noutbuki yoki planshet boshqaruvi">
+                    💻 Boshqaruv Paneli
+                </a>
+                <a href="/remote/{{ room.room_id }}" class="room-link-btn link-remote" title="Smartfon masofaviy pulti">
+                    📱 Smartfon Pulti
+                </a>
+                <a href="/print_qr/{{ room.room_id }}" target="_blank" class="room-link-btn room-stand-btn" title="O'qituvchi stoli uchun A4 formatdagi QR stend">
+                    🖨 Stoldagi A4 QR Stendni Chop Etish
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</main>
+
+<!-- New Room Modal -->
+<div id="new-room-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: left;">
+        <h3 style="margin-bottom: 16px; color: var(--accent-cyan);">Yangi Smart Auditoriya Qo'shish</h3>
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Xona ID (masalan: 305, kimyo-2):</label>
+            <input type="text" id="new-room-id" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Auditoriya Nomi:</label>
+            <input type="text" id="new-room-name" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Xavfsizlik PIN-kodi (4 xonali):</label>
+            <input type="text" id="new-room-pin" maxlength="6" value="1234" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Tavsif (ixtiyoriy):</label>
+            <input type="text" id="new-room-desc" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn btn-secondary" onclick="closeNewRoomModal()">Bekor qilish</button>
+            <button class="btn btn-primary" onclick="submitNewRoom()">Yaratish</button>
+        </div>
+    </div>
+</div>
+<!-- Edit Room Modal -->
+<div id="edit-room-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: left;">
+        <h3 style="margin-bottom: 16px; color: #38bdf8;">Auditoriyani Tahrirlash</h3>
+        <input type="hidden" id="edit-room-id">
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Auditoriya Nomi:</label>
+            <input type="text" id="edit-room-name" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Xavfsizlik PIN-kodi (4 xonali):</label>
+            <input type="text" id="edit-room-pin" maxlength="6" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Tavsif (ixtiyoriy):</label>
+            <input type="text" id="edit-room-desc" style="width: 100%; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white;">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button class="btn btn-secondary" onclick="closeEditRoomModal()">Bekor qilish</button>
+            <button class="btn btn-primary" onclick="submitEditRoom()">Saqlash</button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Room Modal -->
+<div id="delete-room-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="text-align: center;">
+        <div style="font-size: 2.5rem; color: #ef4444; margin-bottom: 8px;">⚠️</div>
+        <h3 style="margin-bottom: 12px; color: white;">Auditoriyani O'chirish</h3>
+        <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px;">
+            Haqiqatan ham <strong id="delete-room-name-label" style="color: white;"></strong> xonasini va uning barcha ma'lumotlarini o'chirib tashlamoqchimisiz?
+        </p>
+        <input type="hidden" id="delete-room-id">
+        <div style="display: flex; justify-content: center; gap: 12px;">
+            <button class="btn btn-secondary" onclick="closeDeleteRoomModal()">Bekor qilish</button>
+            <button class="btn btn-primary" style="background: #dc2626; border-color: #ef4444;" onclick="executeDeleteRoom()">Ha, O'chirish</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Real-time live room filter
+function filterRoomsList(query) {
+    const q = query.trim().toLowerCase();
+    const cards = document.querySelectorAll('.room-card');
+    let visibleCount = 0;
+    cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        if (!q || text.includes(q)) {
+            card.style.display = 'flex';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    const countBadge = document.getElementById('rooms-count-badge');
+    if (countBadge) countBadge.textContent = `${visibleCount} ta xona`;
+}
+
+function openNewRoomModal() {
+    document.getElementById('new-room-modal').style.display = 'flex';
+    document.getElementById('new-room-id').focus();
+}
+function closeNewRoomModal() {
+    document.getElementById('new-room-modal').style.display = 'none';
+}
+// Slug auto-formatter for URL-safe room IDs
+document.getElementById('new-room-id').addEventListener('input', function(e) {
+    this.value = this.value.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-');
+});
+async function submitNewRoom() {
+    const id = document.getElementById('new-room-id').value.trim();
+    const name = document.getElementById('new-room-name').value.trim();
+    const pin = document.getElementById('new-room-pin').value.trim();
+    const desc = document.getElementById('new-room-desc').value.trim();
+
+    if (!id || !name) {
+        showToast("Xona ID va nomini kiriting!", "error");
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: id, room_name: name, pin: pin, description: desc })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            showToast("Yangi auditoriya ochildi! ✨", "success");
+            setTimeout(() => window.location.reload(), 600);
+        } else {
+            showToast(data.detail || "Xatolik yuz berdi", "error");
+        }
+    } catch (e) {
+        showToast("Serverga ulanishda xatolik: " + e.message, "error");
+    }
+}
+
+// Edit Room Modal Functions
+function openEditRoomModal(id, name, pin, desc) {
+    document.getElementById('edit-room-id').value = id;
+    document.getElementById('edit-room-name').value = name;
+    document.getElementById('edit-room-pin').value = pin;
+    document.getElementById('edit-room-desc').value = desc || '';
+    document.getElementById('edit-room-modal').style.display = 'flex';
+}
+function closeEditRoomModal() {
+    document.getElementById('edit-room-modal').style.display = 'none';
+}
+async function submitEditRoom() {
+    const id = document.getElementById('edit-room-id').value.trim();
+    const name = document.getElementById('edit-room-name').value.trim();
+    const pin = document.getElementById('edit-room-pin').value.trim();
+    const desc = document.getElementById('edit-room-desc').value.trim();
+
+    if (!name) {
+        showToast("Auditoriya nomini kiriting!", "error");
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/room/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_name: name, pin: pin || '1234', description: desc })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            showToast("Auditoriya ma'lumotlari saqlandi! ✨", "success");
+            setTimeout(() => window.location.reload(), 600);
+        } else {
+            showToast(data.detail || "Tahrirlashda xatolik", "error");
+        }
+    } catch (e) {
+        showToast("Server xatosi: " + e.message, "error");
+    }
+}
+
+// Delete Room Modal Functions
+function confirmDeleteRoom(id, name) {
+    document.getElementById('delete-room-id').value = id;
+    document.getElementById('delete-room-name-label').textContent = name;
+    document.getElementById('delete-room-modal').style.display = 'flex';
+}
+function closeDeleteRoomModal() {
+    document.getElementById('delete-room-modal').style.display = 'none';
+}
+async function executeDeleteRoom() {
+    const id = document.getElementById('delete-room-id').value;
+    try {
+        const resp = await fetch(`/api/room/${id}`, {
+            method: 'DELETE'
+        });
+        if (resp.ok) {
+            showToast("Auditoriya o'chirildi! 🗑️", "success");
+            setTimeout(() => window.location.reload(), 600);
+        } else {
+            const data = await resp.json();
+            showToast(data.detail || "O'chirishda xatolik", "error");
+        }
+    } catch (e) {
+        showToast("Server xatosi: " + e.message, "error");
+    }
+}
+
+// Close modals on Escape key
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeNewRoomModal();
+        closeEditRoomModal();
+        closeDeleteRoomModal();
+    }
+});
+</script>
+{% endblock %}
+

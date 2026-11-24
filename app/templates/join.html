@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoriyaga Ulanish: {{ room.room_name }} - DDDS Cloud{% endblock %}
+
+{% block extra_css %}
+<style>
+.join-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0b0f19 80%);
+}
+.join-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 520px;
+    padding: 32px 28px;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+}
+.join-brand-badge {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.join-room-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 6px;
+}
+.join-pin-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(2, 132, 199, 0.15);
+    border: 1px solid var(--primary);
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-size: 0.9rem;
+    color: var(--accent-cyan);
+    margin-bottom: 24px;
+}
+.join-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.join-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--bg-main);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: white;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+.join-option-btn:hover {
+    border-color: var(--accent-cyan);
+    transform: translateY(-2px);
+    background: var(--bg-surface);
+}
+.join-btn-icon {
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+}
+.join-btn-text h4 {
+    font-size: 1.05rem;
+    margin-bottom: 2px;
+}
+.join-btn-text p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="join-container">
+    <div class="join-card">
+        <div class="join-brand-badge">DDDS Cloud Smart Classroom</div>
+        <h1 class="join-room-title">{{ room.room_name }}</h1>
+        <div class="join-pin-box">
+            <span>Xavfsizlik PIN-kodi:</span>
+            <strong style="font-size: 1.1rem; letter-spacing: 2px;">{{ room.pin }}</strong>
+        </div>
+
+        <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px;">
+            Qurilmangizga mos boshqaruv turini tanlang:
+        </p>
+
+        <div class="join-options-list">
+            <!-- Mobile Controller -->
+            <a href="/remote/{{ room.room_id }}" class="join-option-btn" style="border-color: var(--accent-emerald);">
+                <div class="join-btn-icon">📱</div>
+                <div class="join-btn-text">
+                    <h4 style="color: #34d399;">Smartfon Pulti (Tavsiya etiladi)</h4>
+                    <p>Slayd almashishi, lazer ko'rsatgich va ma'ruzachi eslatmalari</p>
+                </div>
+            </a>
+
+            <!-- Laptop Admin Dashboard -->
+            <a href="/admin/{{ room.room_id }}" class="join-option-btn" style="border-color: var(--primary);">
+                <div class="join-btn-icon">💻</div>
+                <div class="join-btn-text">
+                    <h4 style="color: #38bdf8;">O'qituvchi Boshqaruv Paneli</h4>
+                    <p>Noutbukda dual displey, jonli ekran uzatish (WebRTC) va PDF/PPTX yuklash</p>
+                </div>
+            </a>
+
+            <!-- Screen 1 -->
+            <a href="/screen/{{ room.room_id }}/1" class="join-option-btn">
+                <div class="join-btn-icon">🖥</div>
+                <div class="join-btn-text">
+                    <h4>1-Smart Monitor (Chap Displey)</h4>
+                    <p>Kiosk rejimida to'liq ekranda ochiladi</p>
+                </div>
+            </a>
+
+            <!-- Screen 2 -->
+            <a href="/screen/{{ room.room_id }}/2" class="join-option-btn">
+                <div class="join-btn-icon">🖥</div>
+                <div class="join-btn-text">
+                    <h4>2-Smart Monitor (O'ng Displey)</h4>
+                    <p>Split yoki Mirror rejimida o'ng ekranda ochiladi</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

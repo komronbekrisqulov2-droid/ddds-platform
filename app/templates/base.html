@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0b0f19">
+    <title>{% block title %}DDDS Cloud - Smart Classroom Platform{% endblock %}</title>
+    
+    <!-- Zero-CDN Self-Contained Styles -->
+    <link rel="stylesheet" href="/static/css/common.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Toast Notification Container -->
+    <div id="ddds-toast-container"></div>
+
+    {% block content %}{% endblock %}
+
+    <!-- Core Client Engine -->
+    <script src="/static/js/ddds-client.js"></script>
+    <script src="/static/js/laser.js"></script>
+    <script src="/static/js/draw.js"></script>
+    <script src="/static/js/webrtc.js"></script>
+    <script>
+    // Global Toast Notification
+    function showToast(message, type = 'info', duration = 2600) {
+        let container = document.getElementById('ddds-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'ddds-toast-container';
+            document.body.appendChild(container);
+        }
+        const icons = {
+            success: '✨',
+            error: '⚠️',
+            info: 'ℹ️'
+        };
+        const toast = document.createElement('div');
+        toast.className = `ddds-toast toast-${type}`;
+        toast.innerHTML = `<span>${icons[type] || '✨'}</span><span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('toast-fadeout');
+            setTimeout(() => toast.remove(), 320);
+        }, duration);
+    }
+
+    // Global copyToClipboard with visual toast & fallback
+    function copyToClipboard(text, btnElement = null) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Nusxalandi! 📋", "success");
+                if (btnElement) {
+                    const originalText = btnElement.innerHTML;
+                    btnElement.innerHTML = "Nusxalandi! ✓";
+                    setTimeout(() => { btnElement.innerHTML = originalText; }, 1800);
+                }
+            }).catch(() => fallbackCopy(text, btnElement));
+        } else {
+            fallbackCopy(text, btnElement);
+        }
+    }
+
+    function fallbackCopy(text, btnElement) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.style.position = 'fixed';
+        temp.style.opacity = '0';
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+            document.execCommand('copy');
+            showToast("Nusxalandi! 📋", "success");
+        } catch (e) {
+            showToast("Nusxalashda xatolik", "error");
+        }
+        document.body.removeChild(temp);
+    }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

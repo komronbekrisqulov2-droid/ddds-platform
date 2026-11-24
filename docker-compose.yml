@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ddds-cloud:
+    build: .
+    container_name: ddds_classroom_server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DDDS_HOST=0.0.0.0
+      - DDDS_PORT=8000
+      - DDDS_DEBUG=False
+    volumes:
+      - ./uploads:/app/uploads
+      - ./cache:/app/cache
+

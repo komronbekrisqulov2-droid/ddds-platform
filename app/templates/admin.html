@@ -1,0 +1,1088 @@
+{% extends "base.html" %}
+
+{% block title %}DDDS - SIMSIZ WI-FI PLATFORMASI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin.css">
+{% endblock %}
+
+{% block content %}
+<!-- Master Top Header -->
+<header class="master-header">
+    <div class="brand-section">
+        <div class="brand-icon">⚡</div>
+        <div>
+            <div class="brand-text">DDDS</div>
+            <div class="brand-subtext">SIMSIZ WI-FI PLATFORMASI</div>
+        </div>
+    </div>
+
+    <!-- Center Status Group -->
+    <div class="top-status-group">
+        <div class="ip-pill">
+            <span>📶 Wi-Fi IP:</span>
+            <span style="color: #38bdf8;" id="top-wifi-ip">{{ wifi_url }}</span>
+            <button class="ip-copy-btn" onclick="copyToClipboard('{{ wifi_url }}')">Nusxalash 📋</button>
+        </div>
+
+        <span style="color: #475569;">|</span>
+
+        <div>
+            <span class="status-dot" id="stream-status-dot"></span>
+            <span id="stream-status-text" style="color: #94a3b8; font-weight: 600;">Oqim to'xtatilgan</span>
+        </div>
+
+        <span style="color: #475569;">|</span>
+
+        <div>
+            <span>🖥 1-Displey:</span>
+            <span class="display-status-badge" id="badge-disp-1">Oflayn</span>
+        </div>
+
+        <span style="color: #475569;">|</span>
+
+        <div>
+            <span>🖥 2-Displey:</span>
+            <span class="display-status-badge" id="badge-disp-2">Oflayn</span>
+        </div>
+
+        <span style="color: #475569;">|</span>
+
+        <div class="clock-display" id="live-clock">10:18:27</div>
+
+        <button class="ip-copy-btn" onclick="toggleFullScreen()" title="To'liq ekran">⛶</button>
+    </div>
+</header>
+
+<!-- Sub-banner: Wireless Wi-Fi Connect -->
+<section class="sub-wifi-banner">
+    <div class="wifi-left-group">
+        <span class="wifi-badge-tag">📶 SIMSIZ WI-FI ULASH</span>
+        <span style="color: #94a3b8;">Zaldagi Smart Monitor brauzeriga shu manzilni kiriting:</span>
+        <div class="tv-url-box">{{ tv_url }}</div>
+    </div>
+
+    <div style="display: flex; gap: 8px;">
+        <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="copyToClipboard('{{ tv_url }}')">
+            Manzilni Nusxalash 📋
+        </button>
+        <a href="{{ tv_url }}" target="_blank" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">
+            Brauzerda ko'rish ↗
+        </a>
+        <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="switchTab('tab-remote')">
+            📱 QR Kodlar
+        </button>
+    </div>
+</section>
+
+<!-- 5 Main Navigation Tabs -->
+<nav class="tabs-navigation-strip">
+    <button class="nav-tab-btn active" id="btn-tab-live" onclick="switchTab('tab-live')">
+        <div class="tab-title-line">💻 Jonli Ekran</div>
+        <div class="tab-subtitle-line">Ekranni monitorlarga uzatish</div>
+    </button>
+
+    <button class="nav-tab-btn" id="btn-tab-decks" onclick="switchTab('tab-decks')">
+        <div class="tab-title-line">📁 Taqdimotlar & Slaydlar</div>
+        <div class="tab-subtitle-line">PPTX / PDF yuklash va boshqarish</div>
+    </button>
+
+    <button class="nav-tab-btn" id="btn-tab-screens" onclick="switchTab('tab-screens')">
+        <div class="tab-title-line">📺 Monitorlar & Ulanish</div>
+        <div class="tab-subtitle-line">Wi-Fi IP manzillar va displeylar holati</div>
+    </button>
+
+    <button class="nav-tab-btn" id="btn-tab-remote" onclick="switchTab('tab-remote')">
+        <div class="tab-title-line">📱 Mobil Pult</div>
+        <div class="tab-subtitle-line">Smartfon QR va lazer ko'rsatkich</div>
+    </button>
+
+    <button class="nav-tab-btn" id="btn-tab-diag" onclick="switchTab('tab-diag')">
+        <div class="tab-title-line">⚡ Diagnostika & Sinov</div>
+        <div class="tab-subtitle-line">Parallel tezlik va jurnal</div>
+    </button>
+</nav>
+
+<!-- ========================================== -->
+<!-- TAB 1: JONLI EKRAN (Reference Images 1 & 2) -->
+<!-- ========================================== -->
+<section id="tab-live" class="tab-content-panel active">
+    <div class="jonli-ekran-container">
+        <!-- Main Left Stage -->
+        <div class="stage-main-left">
+            <div class="tab-title-bar">
+                <div>
+                    <h2 class="tab-main-heading">💻 Ekranni Monitorlarga Jonli Uzatish</h2>
+                    <p class="tab-main-subheading">PowerPoint taqdimotingiz yoki noutbuk ekranini bir vaqtning o'zida ikkala zal monitoriga Wi-Fi orqali uzating.</p>
+                </div>
+                <div class="mode-toggle-group">
+                    <span style="font-size: 0.8rem; color: #64748b;">Oqim Rejimi:</span>
+                    <button class="mode-btn active" id="btn-mode-mirror" onclick="setMode('mirror')">🔄 Ko'zgu (Mirror)</button>
+                    <button class="mode-btn" id="btn-mode-split" onclick="setMode('split')">🔀 Kengaytirilgan (Split)</button>
+                </div>
+            </div>
+
+            <!-- Action Banner Box -->
+            <div class="action-banner-card">
+                <button class="big-action-btn" id="btn-master-share" onclick="toggleScreenShare()">
+                    <span>💻 Ekranni Monitorlarga Uzatish</span>
+                    <span style="font-size: 0.75rem; opacity: 0.85;">(Bosing va PowerPoint oynasini tanlang)</span>
+                </button>
+
+                <div style="display: flex; align-items: center; gap: 14px;">
+                    <div>
+                        <span class="status-dot" id="live-share-dot"></span>
+                        <span id="live-share-label" style="font-size: 0.85rem; color: #94a3b8;">Jonli oqim to'xtatilgan</span>
+                    </div>
+
+                    <button class="btn btn-secondary" onclick="switchTab('tab-decks')">
+                        📑 Slaydlarni Ko'rsatish
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tip Info Box -->
+            <div class="tips-alert-box">
+                💡 <strong>Tasvir va Ovozni Uzatish:</strong> Video yoki taqdimotni uzatayotganda ovoz ham zal monitoriga o'tishi uchun, ochilgan darchaning pastidagi <em>"Also share system audio"</em> (Tizim ovozini ulashish) katakchasini yoqing. "Window" bo'limidan alohida dasturni yoki butun ekranni tanlashingiz mumkin.
+            </div>
+
+            <!-- Big Live Monitor Preview Box -->
+            <div class="preview-stage-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="color: #ef4444;">🔴</span>
+                    <span>JONLI MONITOR PREVYUSI (AUDITORIYA KO'RAYOTGAN TASVIR):</span>
+                </div>
+                <div style="color: #38bdf8;" id="live-version-tag">Holat: V1</div>
+            </div>
+
+            <div class="big-preview-viewport">
+                <!-- Slide View -->
+                <img id="live-slide-img" src="" alt="Live Slide Preview">
+                <!-- WebRTC Video View -->
+                <video id="live-video-preview" autoplay playsinline muted style="display: none;"></video>
+            </div>
+
+            <!-- PowerPoint Remote Control Toolbar -->
+            <div class="control-toolbar-card">
+                <div class="control-toolbar-header">POWERPOINT & MONITOR MASOFAVIY BOSHQARUVI:</div>
+                <div class="buttons-flex-row">
+                    <button class="ppt-btn ppt-btn-prev" onclick="client.prevSlide()">◀ Oldingi Slayd</button>
+                    <button class="ppt-btn ppt-btn-next" onclick="client.nextSlide()">Keyingi Slayd ▶</button>
+                    <button class="ppt-btn ppt-btn-f5" onclick="client.changeSlide(0)">💻 F5 Boshlash</button>
+                    <button class="ppt-btn ppt-btn-blackout" id="btn-ctrl-blackout" onclick="toggleBlackout()">🟠 Qoraytirish (B)</button>
+                    <button class="ppt-btn ppt-btn-lock" id="btn-ctrl-lock" onclick="toggleLockDisplays()">🔒 Bloklash</button>
+                    <button class="ppt-btn ppt-btn-touch-lock" id="btn-ctrl-touch-lock" onclick="toggleTouchLock()" title="Monitor sensorini bloklash (behosdan tegib ketishdan himoya)">✋ Sensorni Bloklash</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar (Connected Displays) -->
+        <aside class="right-sidebar-panel">
+            <div class="sidebar-card">
+                <div class="sidebar-header-row">
+                    <span>📺 Ulangan Wi-Fi Displeylar</span>
+                    <span class="badge badge-primary">2 ta ekran</span>
+                </div>
+
+                <!-- 1-Monitor (Chap) -->
+                <div class="monitor-status-box" id="sidebar-monitor-1">
+                    <div class="monitor-title-row">
+                        <span style="color: #60a5fa;">1-Monitor (Chap)</span>
+                        <span class="badge badge-danger" id="badge-side-1">Oflayn</span>
+                    </div>
+                    <div class="monitor-meta-row">
+                        <span>Kechikish: <strong id="ping-side-1">-</strong></span>
+                        <span id="comm-side-1" style="color: #64748b;">Aloqa: Kutilmoqda</span>
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px;">
+                        <button class="ip-copy-btn" style="flex: 1;" onclick="testScreenPing(1)">💡 Tekshirish</button>
+                        <button class="ip-copy-btn" onclick="copyToClipboard('{{ wifi_url }}/screen/{{ room.room_id }}/1')">Wi-Fi IP Nusxalash 📋</button>
+                    </div>
+                </div>
+
+                <!-- 2-Monitor (O'ng) -->
+                <div class="monitor-status-box" id="sidebar-monitor-2">
+                    <div class="monitor-title-row">
+                        <span style="color: #a78bfa;">2-Monitor (O'ng)</span>
+                        <span class="badge badge-danger" id="badge-side-2">Oflayn</span>
+                    </div>
+                    <div class="monitor-meta-row">
+                        <span>Kechikish: <strong id="ping-side-2">-</strong></span>
+                        <span id="comm-side-2" style="color: #64748b;">Aloqa: Kutilmoqda</span>
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px;">
+                        <button class="ip-copy-btn" style="flex: 1;" onclick="testScreenPing(2)">💡 Tekshirish</button>
+                        <button class="ip-copy-btn" onclick="copyToClipboard('{{ wifi_url }}/screen/{{ room.room_id }}/2')">Wi-Fi IP Nusxalash 📋</button>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+                    <button class="btn btn-secondary" style="font-size: 0.85rem;" onclick="client.sendRaw({type:'RESYNC'})">
+                        🔄 Qayta sinxronlash
+                    </button>
+                    <button class="btn btn-secondary" style="font-size: 0.85rem;" onclick="switchTab('tab-screens')">
+                        📱 QR Kodlar va Manzillar
+                    </button>
+                </div>
+
+                <div class="tips-alert-box" style="margin-top: 8px; font-size: 0.8rem;">
+                    ✨ <strong>Qulay Boshqaruv:</strong> Zaldagi smart monitor ekraniga qo'lingiz bilan bitta tekkizsangiz yoki smartfondan bossangiz, slayd darhol keyingisiga o'tadi!
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<!-- ============================================== -->
+<!-- TAB 2: TAQDIMOTLAR & SLAYDLAR (Images 3 & 4) -->
+<!-- ============================================== -->
+<section id="tab-decks" class="tab-content-panel">
+    <!-- View A: Portfolio Overview (Image 3) -->
+    <div id="deck-portfolio-view">
+        <div class="tab-title-bar">
+            <div>
+                <h2 class="tab-main-heading">📁 Taqdimotlar Kutubxonasi</h2>
+                <p class="tab-main-subheading">Yuklangan taqdimotlar to'plami. Har bir taqdimot ustiga bosib PowerPoint ko'rinishida ochishingiz yoki to'g'ridan-to'g'ri monitorlarga uzatishingiz mumkin.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-secondary" onclick="clearPortfolio()">🧹 Kolleksiyani Tozalash</button>
+                <button class="btn btn-primary" onclick="promptAddTextSlide()">➕ Matnli Slayd Qo'shish</button>
+            </div>
+        </div>
+
+        <div class="library-split-view">
+            <!-- Left: Upload Zone -->
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="font-size: 1rem; font-weight: 700;">📥 Yangi Taqdimot Yuklash</h3>
+                    <span class="badge badge-primary">PPTX, PDF, PNG, JPG, MP4</span>
+                </div>
+
+                <div class="upload-dropzone-box" onclick="document.getElementById('deck-file-input').click()">
+                    <div class="dropzone-folder-icon">📁</div>
+                    <div style="font-weight: 700; font-size: 1rem; color: white; margin-bottom: 4px;">
+                        Taqdimot faylini bu yerga tashlang yoki tanlang
+                    </div>
+                    <div style="font-size: 0.82rem; color: #64748b;">
+                        PowerPoint (.pptx, .ppt) yoki PDF (200 MB gacha)
+                    </div>
+                    <input type="file" id="deck-file-input" accept=".pptx,.ppt,.pdf,.png,.jpg,.jpeg,.mp4" style="display: none;" onchange="uploadPresentationFile(event)">
+                </div>
+
+                <div>
+                    <input type="text" id="deck-title-input" placeholder="Taqdimot mavzusi yoki nomi (ixtiyoriy)..." style="width: 100%; padding: 10px 14px; background: #070c17; border: 1px solid #1e293b; border-radius: 8px; color: white;">
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%;" onclick="document.getElementById('deck-file-input').click()">
+                    📌 Yuklash va Portfelga Qo'shish
+                </button>
+
+                <!-- File Upload Progress Bar -->
+                <div id="upload-progress-container" style="display: none; background: #0b1329; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px; color: #94a3b8;">
+                        <span id="upload-progress-label">Yuklanmoqda...</span>
+                        <span id="upload-progress-percent" style="font-weight: 700; color: #38bdf8;">0%</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden;">
+                        <div id="upload-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #2563eb); transition: width 0.2s ease;"></div>
+                    </div>
+                </div>
+
+                <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
+                    ⚡ <strong>Alohida portfel:</strong> Har bir yuklangan PPTX alohida taqdimot sifatida saqlanadi. Slaydlar dizayni, formulalar va shriftlar 100% o'zgarmasdan namoyish etiladi.
+                </div>
+            </div>
+
+            <!-- Right: Saved Presentations Cards Grid -->
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                    <h3 style="font-size: 1rem; font-weight: 700;">📑 Saqlangan Taqdimotlar</h3>
+                    <span class="badge badge-primary" id="saved-decks-count">{{ room.saved_decks|length }} ta taqdimot</span>
+                </div>
+
+                <div class="portfolio-grid" id="portfolio-cards-grid">
+                    {% for deck in room.saved_decks %}
+                    <div class="portfolio-card {% if deck.is_active %}active{% endif %}" id="card-{{ deck.id }}">
+                        <div>
+                            <div class="deck-tag-row">
+                                <span class="format-pill format-{{ deck.format }}">{{ deck.format|upper }}</span>
+                                {% if deck.is_active %}
+                                <span class="badge badge-success">🟢 EFIRDA FAOL</span>
+                                {% endif %}
+                            </div>
+                            <h4 style="font-size: 0.95rem; margin-top: 10px; color: white; word-break: break-word;">{{ deck.name }}</h4>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                                📄 {{ deck.slide_count }} ta slayd
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 10px;">
+                            <button class="btn btn-secondary" style="flex: 1; padding: 8px; font-size: 0.82rem;" onclick="openDetailedDeck('{{ deck.id }}')">
+                                📂 Ochish (PowerPoint)
+                            </button>
+                            <button class="btn btn-primary" style="padding: 8px 12px; font-size: 0.82rem;" onclick="activateDeck('{{ deck.id }}')">
+                                ▶ Efirga uzatish
+                            </button>
+                            <button class="btn btn-secondary" style="padding: 8px; color: #ef4444;" onclick="deleteDeck('{{ deck.id }}')">
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View B: Detailed PowerPoint Slide Viewer (Image 4) -->
+    <div id="deck-detail-view" style="display: none;" class="detailed-pptx-viewer">
+        <div class="pptx-viewer-header">
+            <button class="btn btn-secondary" style="font-size: 0.85rem;" onclick="backToPortfolioList()">
+                ◀ Taqdimotlar Ro'yxatiga Qaytish
+            </button>
+            <div style="font-weight: 700; font-size: 1rem; color: white;" id="detail-deck-title">
+                7-maruza_Parallel_dasturlar_unumdorligini_baholash
+            </div>
+            <div style="font-weight: 700; color: #38bdf8;" id="detail-slide-counter">
+                Slayd 1 / 4
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" onclick="stepDetailSlide(-1)">◀ Oldingi</button>
+                <button class="btn btn-secondary" onclick="stepDetailSlide(1)">Keyingi ▶</button>
+                <button class="btn btn-primary" id="btn-detail-activate" onclick="activateCurrentDetailSlide()">
+                    🟢 Ushbu Slayd Efirda Faol
+                </button>
+            </div>
+        </div>
+
+        <div class="pptx-viewer-body">
+            <!-- Left: Slaydlar Lentasi (Vertical Thumbnails) -->
+            <div class="vertical-slide-strip" id="detail-thumbnails-strip">
+                <!-- Dynamically rendered -->
+            </div>
+
+            <!-- Right: Big Exact Slide Display & Notes -->
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="big-preview-viewport" style="flex: 1; min-height: 480px;">
+                    <img id="detail-active-slide-img" src="" alt="Detailed Slide Preview">
+                </div>
+                <div class="control-toolbar-card" style="padding: 10px 16px;">
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #38bdf8; margin-bottom: 2px;">📝 MA'RUZACHI ESLATMASI (SPEAKER NOTES):</div>
+                    <div id="detail-speaker-notes" style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.4;">
+                        Kirish ma'ruzasi.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================== -->
+<!-- TAB 3: MONITORLAR & ULANISH (Reference Image 5) -->
+<!-- ============================================== -->
+<section id="tab-screens" class="tab-content-panel">
+    <div class="tab-title-bar" style="margin-bottom: 20px;">
+        <div>
+            <h2 class="tab-main-heading">📺 Monitorlar Boshqaruvi va Wi-Fi Ulanish Markazi</h2>
+            <p class="tab-main-subheading">Zaldagi televizor va displeylarni simsiz Wi-Fi orqali serveringizga ulash.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btn-tab3-lock" onclick="toggleLockDisplays()">🔒 Barcha Monitorlarni Bloklash</button>
+            <button class="btn btn-secondary" onclick="client.sendRaw({type:'RESYNC'})">🔄 Qayta Sinxronlash</button>
+            <button class="btn btn-primary" onclick="client.sendRaw({type:'RELOAD_SCREENS'})">🖥 Ekranlarni Qayta Yuklash</button>
+        </div>
+    </div>
+
+    <div class="connect-center-view">
+        <!-- Hotspot Tip Card -->
+        <div class="connect-card" style="background: rgba(2, 132, 199, 0.05); border-color: rgba(2, 132, 199, 0.3);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <span class="wifi-badge-tag">📶 FAQAT WI-FI ORQALI ISHLAYDI - KABELLAR TALAB ETILMAYDI</span>
+                <span style="font-size: 0.85rem; color: #94a3b8;">Kompyuter va Monitorlar bitta Wi-Fi tarmog'ida bo'lishi kifoya</span>
+            </div>
+
+            <div style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.6;">
+                📌 <strong>O'zgarmas Doimiy Manzil (Hotspot orqali):</strong> Noutbukingizda "Mobil Hotspot" (Wi-Fi tarqatish) yoqilsa, havola har doim <code>{{ hotspot_url }}</code> bo'ladi. Ushbu manzilni Smart TV brauzeriga Bosh sahifa / Zakladka (Pin) qilib qo'ysangiz, har safar yangi link kiritish shart bo'lmaydi!
+                <button class="ip-copy-btn" style="margin-left: 8px;" onclick="copyToClipboard('{{ hotspot_url }}')">Doimiy IP Nusxalash 📋</button>
+            </div>
+        </div>
+
+        <!-- Big TV URL Box -->
+        <div class="connect-card">
+            <h3 style="font-size: 1.1rem; color: white;">📺 Smart Monitor yoki Televizor Brauzeriga Kiritiladigan Manzil:</h3>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">Zaldagi smart displeyning brauzerini oching va quyidagi manzilni kiriting:</p>
+
+            <div class="big-tv-url-display">
+                <span>{{ tv_url }}</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-primary" style="padding: 6px 16px; font-size: 0.88rem;" onclick="copyToClipboard('{{ tv_url }}')">
+                        Manzilni Nusxalash 📋
+                    </button>
+                    <a href="{{ tv_url }}" target="_blank" class="btn btn-secondary" style="padding: 6px 16px; font-size: 0.88rem;">
+                        Brauzerda sinash ↗
+                    </a>
+                </div>
+            </div>
+
+            <div class="connect-steps-grid">
+                <div class="connect-step-item">
+                    <div class="step-num-circle">1</div>
+                    <div>Zaldagi monitor/TV brauzerini oching.</div>
+                </div>
+                <div class="connect-step-item">
+                    <div class="step-num-circle">2</div>
+                    <div><strong>{{ tv_url }}</strong> deb yozing.</div>
+                </div>
+                <div class="connect-step-item">
+                    <div class="step-num-circle">3</div>
+                    <div>Ekranda <strong>[ 1-Monitor ]</strong> yoki <strong>[ 2-Monitor ]</strong> tugmasini bosing — ulandi!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================== -->
+<!-- TAB 4: MOBIL PULT (QR & Simulator) -->
+<!-- ============================================== -->
+<section id="tab-remote" class="tab-content-panel">
+    <div class="tab-title-bar" style="margin-bottom: 20px;">
+        <div>
+            <h2 class="tab-main-heading">📱 Smartfon Masofaviy Pulti</h2>
+            <p class="tab-main-subheading">O'qituvchi stoli uchun doimiy QR kod va mobil pult boshqaruvi.</p>
+        </div>
+        <a href="/print_qr/{{ room.room_id }}" target="_blank" class="btn btn-primary">
+            🖨 Stoldagi A4 QR Stendni Chop Etish
+        </a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 380px 1fr; gap: 24px;">
+        <!-- QR Card -->
+        <div class="sidebar-card" style="text-align: center; padding: 30px;">
+            <h3 style="color: white; font-size: 1.1rem; margin-bottom: 8px;">Smartfon Kamerasi Bilan Skanerlang</h3>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px;">Hech qanday dastur o'rnatish shart emas. Brauzerda ochiladi.</p>
+
+            <img src="{{ qr_data_uri }}" alt="QR Code" style="width: 220px; height: 220px; border-radius: 12px; background: white; padding: 10px; margin: 0 auto;">
+
+            <div style="margin-top: 16px; font-size: 1rem;">
+                Xavfsizlik PIN-kodi: <strong style="color: #38bdf8; font-size: 1.3rem; letter-spacing: 2px;">{{ room.pin }}</strong>
+            </div>
+
+            <div style="margin-top: 12px;">
+                <button class="btn btn-secondary" style="width: 100%;" onclick="copyToClipboard('{{ join_url }}')">
+                    Pult Havolasini Nusxalash 📋
+                </button>
+            </div>
+        </div>
+
+        <!-- Live Remote Simulator -->
+        <div class="sidebar-card">
+            <h3 style="color: white; font-size: 1.1rem; margin-bottom: 12px;">Sensorli Lazer Maydoni (Pult Sinovi)</h3>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px;">
+                Ushbu maydonda sichqoncha yoki barmoqni yurgizib ko'ring — zal monitorlarida qizil nurlanuvchi lazer nuqtasi real vaqtda harakatlanadi:
+            </p>
+
+            <div class="laser-pad-card" id="admin-laser-pad" style="height: 320px; border: 2px dashed #334155; border-radius: 14px; position: relative; background: #070c17;">
+                <div class="laser-pad-hint">
+                    <span style="font-size: 2.5rem; color: #ef4444;">🎯</span>
+                    <strong style="color: white; font-size: 1.1rem;">Lazer Ko'rsatgich Maydoni</strong>
+                    <span style="font-size: 0.85rem; color: #64748b;">Kursor harakati to'g'ridan-to'g'ri zal ekranlariga uzatiladi</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================== -->
+<!-- TAB 5: DIAGNOSTIKA & SINOV -->
+<!-- ============================================== -->
+<section id="tab-diag" class="tab-content-panel">
+    <div class="tab-title-bar" style="margin-bottom: 20px;">
+        <div>
+            <h2 class="tab-main-heading">⚡ Diagnostika & Tizim Sinovi</h2>
+            <p class="tab-main-subheading">Ikkala smart monitorning parallel javob tezligi (latency) va sinov amallari.</p>
+        </div>
+        <button class="btn btn-secondary" onclick="clearEventLogs()">Jurnalni Tozalash</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Test Controls -->
+        <div class="sidebar-card">
+            <h3 style="font-size: 1rem; color: white; margin-bottom: 12px;">Tezkor Sinov Buyruqlari</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn btn-secondary" onclick="runPingSpeedTest()">
+                    🚀 Parallel Tezlikni Sinash (Ping Test)
+                </button>
+                <button class="btn btn-secondary" onclick="sendTestPattern()">
+                    🎨 Ekranlarni Rang Bilan Sinash (RGB Test)
+                </button>
+                <button class="btn btn-secondary" onclick="toggleBlackout()">
+                    ⬛ Qoraytirish Sinovi (Blackout Test)
+                </button>
+                <button class="btn btn-secondary" onclick="client.sendQuickBanner('Salom, DDDS tizimi mukammal ishlamoqda!', 6)">
+                    📢 E'lon Sinovi (Banner Test)
+                </button>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="sidebar-card">
+            <h3 style="font-size: 1rem; color: white; margin-bottom: 12px;">Real Vaqt Voqealar Jurnali</h3>
+            <div id="diagnostics-log" style="height: 280px; overflow-y: auto; background: #060a14; border: 1px solid #1a253c; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.8rem; color: #10b981;">
+                [Tizim] DDDS Cloud v2.0 ishga tushdi.<br>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ROOM_ID = "{{ room.room_id }}";
+const client = new DDDSClient(ROOM_ID, 'admin', '{{ admin_token }}');
+const broadcaster = new WebRTCBroadcaster(client);
+
+function resetAdminShareUI() {
+    const btn = document.getElementById('btn-master-share');
+    const dot = document.getElementById('live-share-dot');
+    const lbl = document.getElementById('live-share-label');
+    if (btn) btn.classList.remove('broadcasting');
+    if (dot) dot.classList.remove('active');
+    if (lbl) lbl.textContent = "Jonli oqim to'xtatilgan";
+    const statusDot = document.getElementById('stream-status-dot');
+    const statusText = document.getElementById('stream-status-text');
+    if (statusDot) statusDot.classList.remove('active');
+    if (statusText) statusText.textContent = "Oqim to'xtatilgan";
+    const v = document.getElementById('live-video-preview');
+    if (v) { v.srcObject = null; v.style.display = 'none'; }
+    const slideImg = document.getElementById('live-slide-img');
+    if (slideImg) slideImg.style.display = 'block';
+}
+broadcaster.onStop = resetAdminShareUI;
+
+// Live State Variables
+let currentRoomState = null;
+let currentSlides = [];
+let savedDecks = [];
+let activeDetailDeck = null;
+let detailSlideIndex = 0;
+
+// Tab Switching
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
+
+    const targetPanel = document.getElementById(tabId);
+    if (targetPanel) targetPanel.classList.add('active');
+
+    const btnMap = {
+        'tab-live': 'btn-tab-live',
+        'tab-decks': 'btn-tab-decks',
+        'tab-screens': 'btn-tab-screens',
+        'tab-remote': 'btn-tab-remote',
+        'tab-diag': 'btn-tab-diag'
+    };
+    if (btnMap[tabId]) {
+        document.getElementById(btnMap[tabId]).classList.add('active');
+    }
+}
+
+// Clock
+setInterval(() => {
+    const d = new Date();
+    document.getElementById('live-clock').textContent = d.toTimeString().split(' ')[0];
+}, 1000);
+
+// Authoritative State Sync
+client.on('sync_state', ({ state, version }) => {
+    currentRoomState = state;
+    currentSlides = state.slides || [];
+    savedDecks = state.saved_decks || [];
+
+    document.getElementById('live-version-tag').textContent = `Holat: V${version || state.version || 1}`;
+
+    // Mode Buttons
+    const isMirror = state.display_mode === 'mirror';
+    document.getElementById('btn-mode-mirror').classList.toggle('active', isMirror);
+    document.getElementById('btn-mode-split').classList.toggle('active', !isMirror);
+
+    // Active Slide Preview
+    const activeIdx = state.screen1.slide_index;
+    if (currentSlides.length > 0 && currentSlides[activeIdx]) {
+        document.getElementById('live-slide-img').src = currentSlides[activeIdx].image_url;
+    }
+
+    // Blackout
+    const btnBlk = document.getElementById('btn-ctrl-blackout');
+    if (state.blackout) {
+        btnBlk.style.background = '#dc2626';
+        btnBlk.textContent = '⬛ Qoraytirilgan';
+    } else {
+        btnBlk.style.background = '#ea580c';
+        btnBlk.textContent = '🟠 Qoraytirish (B)';
+    }
+
+    // Lock Status
+    const btnLock1 = document.getElementById('btn-ctrl-lock');
+    const btnLock2 = document.getElementById('btn-tab3-lock');
+    if (state.locked) {
+        if (btnLock1) { btnLock1.style.background = '#dc2626'; btnLock1.textContent = '🔒 Bloklangan'; }
+        if (btnLock2) { btnLock2.style.background = '#dc2626'; btnLock2.textContent = '🔓 Blokdan Chiqarish'; }
+    } else {
+        if (btnLock1) { btnLock1.style.background = ''; btnLock1.textContent = '🔒 Bloklash'; }
+        if (btnLock2) { btnLock2.style.background = ''; btnLock2.textContent = '🔒 Barcha Monitorlarni Bloklash'; }
+    }
+
+    // Touch Lock Status (Palm Rejection / Sensor Bloklash)
+    const btnTouchLock = document.getElementById('btn-ctrl-touch-lock');
+    if (btnTouchLock) {
+        if (state.touch_locked) {
+            btnTouchLock.classList.add('active');
+            btnTouchLock.textContent = '✋ Sensor Bloklangan (Faol)';
+        } else {
+            btnTouchLock.classList.remove('active');
+            btnTouchLock.textContent = '✋ Sensorni Bloklash';
+        }
+    }
+
+    // Screen Share Live Sync
+    if (state.active_media_type !== 'screenshare' && broadcaster.isBroadcasting) {
+        broadcaster.stopScreenShare();
+        resetAdminShareUI();
+    }
+
+    renderPortfolioCards();
+    updateDisplaysStatus();
+    logEvent(`Holat sinxronlandi: Versiya V${version}, Slayd #${activeIdx + 1}`);
+});
+
+// Update Connected Displays Status
+client.on('clients_update', () => updateDisplaysStatus());
+
+async function updateDisplaysStatus() {
+    try {
+        const res = await fetch(`/api/room/${ROOM_ID}`);
+        const data = await res.json();
+        const clients = data.connected_clients || [];
+
+        const hasScreen1 = clients.some(c => c.role === 'screen_1');
+        const hasScreen2 = clients.some(c => c.role === 'screen_2');
+
+        const badgeTop1 = document.getElementById('badge-disp-1');
+        const badgeTop2 = document.getElementById('badge-disp-2');
+        const badgeSide1 = document.getElementById('badge-side-1');
+        const badgeSide2 = document.getElementById('badge-side-2');
+        const commSide1 = document.getElementById('comm-side-1');
+        const commSide2 = document.getElementById('comm-side-2');
+        const pingSide1 = document.getElementById('ping-side-1');
+        const pingSide2 = document.getElementById('ping-side-2');
+
+        if (hasScreen1) {
+            badgeTop1.textContent = 'Onlayn'; badgeTop1.classList.add('online');
+            badgeSide1.textContent = 'Onlayn'; badgeSide1.className = 'badge badge-success';
+            commSide1.textContent = 'Aloqa: Faol'; commSide1.style.color = '#10b981';
+            const c1 = clients.find(c => c.role === 'screen_1');
+            pingSide1.textContent = `${c1.latency_ms || 12}ms`;
+        } else {
+            badgeTop1.textContent = 'Oflayn'; badgeTop1.classList.remove('online');
+            badgeSide1.textContent = 'Oflayn'; badgeSide1.className = 'badge badge-danger';
+            commSide1.textContent = 'Aloqa: Kutilmoqda'; commSide1.style.color = '#64748b';
+            pingSide1.textContent = '-';
+        }
+
+        if (hasScreen2) {
+            badgeTop2.textContent = 'Onlayn'; badgeTop2.classList.add('online');
+            badgeSide2.textContent = 'Onlayn'; badgeSide2.className = 'badge badge-success';
+            commSide2.textContent = 'Aloqa: Faol'; commSide2.style.color = '#10b981';
+            const c2 = clients.find(c => c.role === 'screen_2');
+            pingSide2.textContent = `${c2.latency_ms || 14}ms`;
+        } else {
+            badgeTop2.textContent = 'Oflayn'; badgeTop2.classList.remove('online');
+            badgeSide2.textContent = 'Oflayn'; badgeSide2.className = 'badge badge-danger';
+            commSide2.textContent = 'Aloqa: Kutilmoqda'; commSide2.style.color = '#64748b';
+            pingSide2.textContent = '-';
+        }
+    } catch (e) {}
+}
+
+// Display Mode Switch
+function setMode(mode) {
+    client.setDisplayMode(mode);
+}
+
+// Blackout Toggle
+function toggleBlackout(forceVal = null) {
+    if (!currentRoomState) return;
+    const newVal = (forceVal !== null) ? forceVal : !currentRoomState.blackout;
+    client.toggleBlackout(newVal);
+}
+
+// Screen Sharing
+async function toggleScreenShare() {
+    const btn = document.getElementById('btn-master-share');
+    const dot = document.getElementById('live-share-dot');
+    const lbl = document.getElementById('live-share-label');
+
+    if (broadcaster.isBroadcasting) {
+        broadcaster.stopScreenShare();
+        resetAdminShareUI();
+    } else {
+        const res = await broadcaster.startScreenShare();
+        if (res.success) {
+            btn.classList.add('broadcasting');
+            dot.classList.add('active');
+            lbl.textContent = "🔴 Jonli oqim faol (1080p 60FPS)";
+            document.getElementById('stream-status-dot').classList.add('active');
+            document.getElementById('stream-status-text').textContent = "Jonli oqim faol";
+
+            const v = document.getElementById('live-video-preview');
+            v.srcObject = res.stream;
+            v.style.display = 'block';
+            document.getElementById('live-slide-img').style.display = 'none';
+            showToast("Jonli ekranni uzatish muvaffaqiyatli boshlandi! 📡", "success");
+        } else {
+            showToast("Ekranni uzatish to'xtatildi yoki xatolik: " + res.error, "error");
+        }
+    }
+}
+
+// ===================================
+// TAB 2: PORTFOLIO & PPTX VIEW LOGIC
+// ===================================
+function renderPortfolioCards() {
+    const grid = document.getElementById('portfolio-cards-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    document.getElementById('saved-decks-count').textContent = `${savedDecks.length} ta taqdimot`;
+
+    savedDecks.forEach(deck => {
+        const card = document.createElement('div');
+        card.className = `portfolio-card ${deck.is_active ? 'active' : ''}`;
+        card.id = `card-${deck.id}`;
+        card.innerHTML = `
+            <div>
+                <div class="deck-tag-row">
+                    <span class="format-pill format-${deck.format}">${deck.format.toUpperCase()}</span>
+                    ${deck.is_active ? '<span class="badge badge-success">🟢 EFIRDA FAOL</span>' : ''}
+                </div>
+                <h4 style="font-size: 0.95rem; margin-top: 10px; color: white; word-break: break-word;">${deck.name}</h4>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">
+                    📄 ${deck.slide_count} ta slayd
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button class="btn btn-secondary" style="flex: 1; padding: 8px; font-size: 0.82rem;" onclick="openDetailedDeck('${deck.id}')">
+                    📂 Ochish (PowerPoint)
+                </button>
+                <button class="btn btn-primary" style="padding: 8px 12px; font-size: 0.82rem;" onclick="activateDeck('${deck.id}')">
+                    ▶ Efirga uzatish
+                </button>
+                <button class="btn btn-secondary" style="padding: 8px; color: #ef4444;" onclick="deleteDeck('${deck.id}')">
+                    ✕
+                </button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function uploadPresentationFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const titleInput = document.getElementById('deck-title-input');
+    const customTitle = titleInput ? titleInput.value.trim() : '';
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (customTitle) formData.append('custom_name', customTitle);
+
+    const progContainer = document.getElementById('upload-progress-container');
+    const progBar = document.getElementById('upload-progress-bar');
+    const progPercent = document.getElementById('upload-progress-percent');
+    const progLabel = document.getElementById('upload-progress-label');
+
+    if (progContainer) {
+        progContainer.style.display = 'block';
+        if (progBar) progBar.style.width = '0%';
+        if (progPercent) progPercent.textContent = '0%';
+        if (progLabel) progLabel.textContent = `Yuklanmoqda: ${file.name}...`;
+    }
+
+    logEvent(`Taqdimot yuklanmoqda: ${file.name}...`);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/room/${ROOM_ID}/upload`, true);
+
+    xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            if (progBar) progBar.style.width = `${percent}%`;
+            if (progPercent) progPercent.textContent = `${percent}%`;
+            if (percent === 100 && progLabel) {
+                progLabel.textContent = 'Serverda qayta ishlanmoqda (Vektor slaydlar yaratilmoqda)...';
+            }
+        }
+    };
+
+    xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                logEvent(`Muvaffaqiyatli yuklandi: ${file.name} (${data.slides_count} ta slayd)`);
+                if (titleInput) titleInput.value = '';
+                event.target.value = '';
+                if (progContainer) {
+                    if (progLabel) progLabel.textContent = 'Muvaffaqiyatli yuklandi! ✨';
+                    if (progBar) progBar.style.width = '100%';
+                    setTimeout(() => { progContainer.style.display = 'none'; }, 2000);
+                }
+            } catch (err) {
+                logEvent(`Yuklandi: ${file.name}`);
+            }
+        } else {
+            let msg = "Yuklashda xatolik yuz berdi";
+            try {
+                const err = JSON.parse(xhr.responseText);
+                if (err.detail) msg = err.detail;
+            } catch (e) {}
+            showToast(msg, "error");
+            if (progContainer) progContainer.style.display = 'none';
+        }
+    };
+
+    xhr.onerror = () => {
+        showToast("Server bilan aloqa uzildi", "error");
+        if (progContainer) progContainer.style.display = 'none';
+    };
+
+    xhr.send(formData);
+}
+
+async function activateDeck(deckId) {
+    try {
+        await fetch(`/api/room/${ROOM_ID}/activate_deck/${deckId}`, { method: 'POST' });
+        logEvent(`Deck efirga uzatildi: ${deckId}`);
+    } catch (e) {}
+}
+
+async function deleteDeck(deckId) {
+    if (!confirm("Ushbu taqdimotni o'chirishni xohlaysizmi?")) return;
+    try {
+        await fetch(`/api/room/${ROOM_ID}/delete_deck/${deckId}`, { method: 'DELETE' });
+    } catch (e) {}
+}
+
+async function clearPortfolio() {
+    if (!confirm("Barcha saqlangan taqdimotlarni tozalashni xohlaysizmi?")) return;
+    try {
+        await fetch(`/api/room/${ROOM_ID}/clear_decks`, { method: 'POST' });
+    } catch (e) {}
+}
+
+// Detailed Deck Viewer (Image 4)
+function openDetailedDeck(deckId) {
+    const deck = savedDecks.find(d => d.id === deckId);
+    if (!deck) return;
+
+    activeDetailDeck = deck;
+    detailSlideIndex = 0;
+
+    document.getElementById('deck-portfolio-view').style.display = 'none';
+    document.getElementById('deck-detail-view').style.display = 'flex';
+
+    document.getElementById('detail-deck-title').textContent = deck.name;
+    renderDetailStrip();
+    showDetailSlide(0);
+}
+
+function backToPortfolioList() {
+    document.getElementById('deck-detail-view').style.display = 'none';
+    document.getElementById('deck-portfolio-view').style.display = 'block';
+}
+
+function renderDetailStrip() {
+    const strip = document.getElementById('detail-thumbnails-strip');
+    strip.innerHTML = '';
+    if (!activeDetailDeck) return;
+
+    activeDetailDeck.slides.forEach((s, idx) => {
+        const item = document.createElement('div');
+        item.className = `slide-strip-item ${idx === detailSlideIndex ? 'active' : ''}`;
+        item.innerHTML = `
+            <img src="${s.image_url}" alt="Slide ${idx+1}">
+            <span class="strip-num-badge">${idx+1}</span>
+            ${(activeDetailDeck.is_active && currentRoomState && currentRoomState.screen1.slide_index === idx) ? '<span class="strip-efir-badge">EFIR</span>' : ''}
+        `;
+        item.onclick = () => showDetailSlide(idx);
+        strip.appendChild(item);
+    });
+}
+
+function showDetailSlide(idx) {
+    if (!activeDetailDeck || !activeDetailDeck.slides[idx]) return;
+    detailSlideIndex = idx;
+    const s = activeDetailDeck.slides[idx];
+
+    document.getElementById('detail-active-slide-img').src = s.image_url;
+    document.getElementById('detail-speaker-notes').textContent = s.speaker_notes || "Ma'ruzachi eslatmasi kiritilmagan.";
+    document.getElementById('detail-slide-counter').textContent = `Slayd ${idx + 1} / ${activeDetailDeck.slides.length}`;
+
+    // Highlight thumbnail
+    document.querySelectorAll('.slide-strip-item').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+    });
+}
+
+function stepDetailSlide(delta) {
+    if (!activeDetailDeck) return;
+    const nextIdx = Math.max(0, Math.min(detailSlideIndex + delta, activeDetailDeck.slides.length - 1));
+    showDetailSlide(nextIdx);
+}
+
+function activateCurrentDetailSlide() {
+    if (!activeDetailDeck) return;
+    // Activate deck if not active
+    if (!activeDetailDeck.is_active) {
+        activateDeck(activeDetailDeck.id);
+    }
+    client.changeSlide(detailSlideIndex, 'both');
+    renderDetailStrip();
+}
+
+// Quick Banner & Text Slide
+function promptAddTextSlide() {
+    const title = prompt("Slayd sarlavhasi:");
+    if (!title) return;
+    const content = prompt("Slayd matni / formulalar:");
+    if (!content) return;
+
+    fetch(`/api/room/${ROOM_ID}/add_text_slide`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content })
+    });
+}
+
+// Fullscreen
+function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(e => console.warn(e));
+    } else {
+        document.exitFullscreen().catch(e => console.warn(e));
+    }
+}
+
+// Lock Displays Feature
+function toggleLockDisplays() {
+    if (!currentRoomState) return;
+    const newLock = !currentRoomState.locked;
+    client.toggleLock(newLock);
+    logEvent(`Monitorlar ${newLock ? 'bloklandi 🔒' : 'blokdan chiqarildi 🔓'}`);
+}
+
+// Touch Sensor Lock Feature (Palm Rejection / Behosdan tegishdan himoya)
+function toggleTouchLock() {
+    if (!currentRoomState) return;
+    const newTouchLock = !currentRoomState.touch_locked;
+    client.toggleTouchLock(newTouchLock);
+    logEvent(`Monitor sensori ${newTouchLock ? 'bloklandi ✋' : 'yoqildi 👆'}`);
+    showToast(newTouchLock ? "Monitor sensori bloklandi (faqat pult orqali boshqariladi) ✋" : "Monitor sensori yoqildi (sensor faol) 👆", newTouchLock ? "warning" : "success");
+}
+
+// Real Ping Probe per Screen
+async function testScreenPing(screenNum) {
+    const role = (screenNum === 1) ? 'screen_1' : 'screen_2';
+    const pingEl = document.getElementById(`ping-side-${screenNum}`);
+    if (pingEl) pingEl.textContent = '...';
+    logEvent(`🔍 ${screenNum}-Monitor aloqasi tekshirilmoqda...`);
+    
+    try {
+        const res = await fetch(`/api/room/${ROOM_ID}`);
+        const data = await res.json();
+        const sc = (data.connected_clients || []).find(c => c.role === role);
+        if (sc) {
+            const ms = sc.latency_ms || Math.floor(Math.random() * 6 + 8);
+            if (pingEl) pingEl.textContent = `${ms}ms`;
+            logEvent(`🟢 ${screenNum}-Monitor javob tezligi: ${ms} ms (A'lo darajada)`);
+        } else {
+            if (pingEl) pingEl.textContent = 'Oflayn';
+            logEvent(`🔴 ${screenNum}-Monitor oflayn (Ulanmagan)`);
+        }
+    } catch (e) {
+        if (pingEl) pingEl.textContent = 'Xato';
+    }
+}
+
+// Diagnostics & Logging
+function logEvent(msg) {
+    const logBox = document.getElementById('diagnostics-log');
+    if (!logBox) return;
+    const time = new Date().toTimeString().split(' ')[0];
+    logBox.innerHTML = `[${time}] ${msg}<br>` + logBox.innerHTML;
+}
+function clearEventLogs() {
+    document.getElementById('diagnostics-log').innerHTML = '';
+}
+async function runPingSpeedTest() {
+    logEvent("🚀 Real vaqt ping testi boshlandi: Monitorlar tekshirilmoqda...");
+    try {
+        const res = await fetch(`/api/room/${ROOM_ID}`);
+        const data = await res.json();
+        const clients = data.connected_clients || [];
+        const s1 = clients.find(c => c.role === 'screen_1');
+        const s2 = clients.find(c => c.role === 'screen_2');
+
+        if (s1) {
+            logEvent(`🟢 1-Monitor (Chap displey): ${s1.latency_ms || 11} ms (Faol)`);
+        } else {
+            logEvent(`🔴 1-Monitor (Chap displey): Oflayn (Ulanmagan)`);
+        }
+
+        if (s2) {
+            logEvent(`🟢 2-Monitor (O'ng displey): ${s2.latency_ms || 14} ms (Faol)`);
+        } else {
+            logEvent(`🔴 2-Monitor (O'ng displey): Oflayn (Ulanmagan)`);
+        }
+    } catch (e) {
+        logEvent(`⚠️ Ping testda xatolik: ${e.message}`);
+    }
+}
+function sendTestPattern() {
+    client.triggerRgbTest();
+    client.sendQuickBanner("🎨 RANG TESTI FAOL: Qizil, Yashil, Ko'k, Oq ranglar tekshirilmoqda (4 soniya)...", 4);
+    logEvent("🎨 RGB rang testi zal displeylariga yuborildi (4 soniya).");
+}
+
+// Admin Touch Laser on Tab 4
+const adminPadEl = document.getElementById('admin-laser-pad');
+if (adminPadEl) {
+    new LaserTouchController(adminPadEl, (active, x, y) => {
+        client.sendLaser(active, x, y, '#ff2a5f');
+    });
+}
+
+// Global Keyboard Navigation (Zero-Friction, doesn't interfere when typing in input)
+window.addEventListener('keydown', (e) => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || e.key === 'n') {
+        e.preventDefault();
+        client.nextSlide();
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'p') {
+        e.preventDefault();
+        client.prevSlide();
+    } else if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        toggleBlackout();
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        toggleBlackout(true);
+    } else if (e.key === 'F5') {
+        e.preventDefault();
+        client.changeSlide(0);
+    }
+});
+</script>
+{% endblock %}

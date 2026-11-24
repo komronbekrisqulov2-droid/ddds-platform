@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}{{ screen_title }} - DDDS Cloud{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/screen.css">
+{% endblock %}
+
+{% block content %}
+<div id="kiosk-viewport">
+    <!-- Discrete Header Status Badge & Audio Control -->
+    <div class="screen-header-badge" id="screen-badge">
+        <span id="status-indicator">🟢</span>
+        <span style="font-weight: 700; color: white;">{{ screen_title }}</span>
+        <span>•</span>
+        <span>Xona: <strong>{{ room.room_id }}</strong></span>
+        <span>•</span>
+        <span id="latency-val">0ms</span>
+        <button id="btn-unmute-stream" style="display: none; background: rgba(16, 185, 129, 0.25); border: 1px solid #10b981; color: #10b981; padding: 2px 10px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; cursor: pointer; margin-left: 6px;" onclick="toggleStreamAudio()">🔊 Ovozni Yoqish</button>
+    </div>
+
+    <!-- Quick Announcement Banner -->
+    <div id="announcement-banner"></div>
+
+    <!-- 1. Slide Presentation Layer -->
+    <div id="slide-layer" class="slide-layer">
+        <img id="slide-img" src="" alt="Slide Viewport">
+    </div>
+
+    <!-- 2. Synchronized Video Layer -->
+    <div id="video-layer" class="video-layer">
+        <video id="sync-video" playsinline {% if screen_num == 2 %}muted{% endif %}></video>
+    </div>
+
+    <!-- 3. WebRTC Live Screen Sharing Layer -->
+    <div id="screenshare-layer" class="screenshare-layer">
+        <div id="screenshare-loader" class="screenshare-loader">
+            <div class="loader-spinner"></div>
+            <div class="loader-text">📡 Jonli efirga ulanmoqda...</div>
+        </div>
+        <video id="screenshare-video" autoplay playsinline muted></video>
+        <canvas id="fallback-canvas" style="display: none;"></canvas>
+    </div>
+
+    <!-- 4. Whiteboard Grid Layer -->
+    <div id="whiteboard-layer" class="whiteboard-layer theme-grid"></div>
+
+    <!-- 5. Synced Drawing Canvas -->
+    <canvas id="annotation-canvas"></canvas>
+
+    <!-- 6. Full Blackout Overlay -->
+    <div id="blackout-layer"></div>
+
+    <!-- 7. RGB Screen Health Test Overlay -->
+    <div id="rgb-test-overlay" style="display: none; position: fixed; inset: 0; z-index: 99999;"></div>
+
+    <!-- 8. Locked Shield Overlay -->
+    <div id="locked-shield-overlay" style="display: none; position: fixed; inset: 0; z-index: 99998; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); align-items: center; justify-content: center; color: white;">
+        <div style="background: rgba(15,23,42,0.95); border: 2px solid #ef4444; border-radius: 16px; padding: 24px 36px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+            <div style="font-size: 3rem; margin-bottom: 8px;">🔒</div>
+            <h3 style="font-size: 1.3rem; margin-bottom: 4px;">Monitor Bloklangan</h3>
+            <p style="color: #94a3b8; font-size: 0.9rem;">Boshqaruv faqat o'qituvchi noutbuki orqali amalga oshiriladi</p>
+        </div>
+    </div>
+
+    <!-- 9. Floating Smart Board Toolbar (Touch-friendly, Zero-OS Keyboard) -->
+    <div class="floating-smart-toolbar autohide" id="smart-toolbar">
+        <button class="tool-btn" id="btn-touch-prev" title="Oldingi Slayd">◀</button>
+        <button class="tool-btn active" id="btn-tool-pointer" title="Ko'rsatgich">👆</button>
+        <button class="tool-btn" id="btn-tool-pen" title="Qalam">✏️</button>
+        <button class="tool-btn" id="btn-tool-highlighter" title="Marker">🖍️</button>
+        <button class="tool-btn" id="btn-tool-eraser" title="O'chirg'ich">🧹</button>
+        <button class="tool-btn" id="btn-tool-clear" title="Tozalash">🗑️</button>
+        <button class="tool-btn" id="btn-touch-next" title="Keyingi Slayd">▶</button>
+        <button class="tool-btn" id="btn-fullscreen" title="To'liq Ekran">⛶</button>
+    </div>
+
+    <!-- Bottom Handle to reveal toolbar if autohidden -->
+    <div id="toolbar-reveal-handle" style="position: fixed; bottom: 4px; left: 50%; transform: translateX(-50%); z-index: 35; width: 48px; height: 16px; background: rgba(255,255,255,0.15); border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; font-size: 10px;" onclick="showToolbarTemporarily()">▲</div>
+
+    <!-- 10. Discrete Touch Sensor Lock Badge -->
+    <div id="touch-locked-badge" style="display: none; position: fixed; bottom: 18px; left: 24px; z-index: 45; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1.5px solid #ea580c; color: white; padding: 6px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; align-items: center; gap: 8px; box-shadow: 0 4px 16px rgba(234, 88, 12, 0.35);">
+        <span style="font-size: 1rem;">✋</span>
+        <span style="color: #fdba74;">Sensor Bloklangan (Faqat Pult Ishlaydi)</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ROOM_ID = "{{ room.room_id }}";
+const SCREEN_NUM = {{ screen_num }};
+const SCREEN_ROLE = "{{ screen_role }}";
+
+// Initialize DDDS WebSocket Client
+const client = new DDDSClient(ROOM_ID, SCREEN_ROLE);
+
+// Initialize Laser and Canvas
+const laserDisplay = new LaserDisplay(document.body);
+const canvasEl = document.getElementById('annotation-canvas');
+const drawingEngine = new DrawingEngine(canvasEl, (stroke) => {
+    client.sendStroke(stroke);
+});
+drawingEngine.setInteractive(false); // Default to viewing; toolbar enables touch drawing
+
+// Initialize WebRTC Screen Share Receiver
+const videoScreenshareEl = document.getElementById('screenshare-video');
+const canvasFallbackEl = document.getElementById('fallback-canvas');
+const loaderScreenshareEl = document.getElementById('screenshare-loader');
+const rtcReceiver = new WebRTCReceiver(client, videoScreenshareEl, canvasFallbackEl, loaderScreenshareEl);
+
+// UI Elements
+const slideLayer = document.getElementById('slide-layer');
+const slideImg = document.getElementById('slide-img');
+const videoLayer = document.getElementById('video-layer');
+const syncVideo = document.getElementById('sync-video');
+const screenshareLayer = document.getElementById('screenshare-layer');
+const whiteboardLayer = document.getElementById('whiteboard-layer');
+const blackoutLayer = document.getElementById('blackout-layer');
+const latencyVal = document.getElementById('latency-val');
+const statusIndicator = document.getElementById('status-indicator');
+const bannerEl = document.getElementById('announcement-banner');
+const toolbar = document.getElementById('smart-toolbar');
+
+let currentSlideIndex = -1;
+let currentSlides = [];
+
+// Latency & Connection
+client.on('pong', ({ latency }) => {
+    latencyVal.textContent = `${latency}ms`;
+});
+client.on('connection_change', ({ status }) => {
+    if (status === 'connected') {
+        statusIndicator.textContent = '🟢';
+    } else {
+        statusIndicator.textContent = '🔴';
+        latencyVal.textContent = 'Ulanmoqda...';
+    }
+});
+
+// Authoritative State Sync (Catch-Up & Live Updates)
+client.on('sync_state', ({ state, reason }) => {
+    window.currentRoomState = state;
+    const newSlides = state.slides || [];
+    // Preload all slides into memory so transitions have 0ms latency
+    if (newSlides.length > 0 && newSlides !== currentSlides) {
+        newSlides.forEach(s => {
+            if (s.image_url) {
+                const img = new Image();
+                img.src = s.image_url;
+            }
+        });
+    }
+    currentSlides = newSlides;
+    
+    // 1. Blackout & Lock Shields
+    blackoutLayer.style.display = state.blackout ? 'block' : 'none';
+    const lockedShield = document.getElementById('locked-shield-overlay');
+    if (lockedShield) lockedShield.style.display = state.locked ? 'flex' : 'none';
+
+    // Touch Lock Badge (Palm Rejection Indicator)
+    const touchLockedBadge = document.getElementById('touch-locked-badge');
+    if (touchLockedBadge) touchLockedBadge.style.display = state.touch_locked ? 'flex' : 'none';
+
+    // 2. Active Screen specific slide index
+    const myScreenState = (SCREEN_NUM === 1) ? state.screen1 : state.screen2;
+    const targetSlideIdx = myScreenState.slide_index;
+
+    // 3. Media Mode Routing
+    const activeMedia = state.active_media_type;
+
+    slideLayer.style.display = 'none';
+    videoLayer.style.display = 'none';
+    whiteboardLayer.style.display = 'none';
+
+    if (activeMedia === 'slides') {
+        rtcReceiver.stopReceiver();
+        screenshareLayer.style.display = 'none';
+        slideLayer.style.display = 'flex';
+        renderSlide(targetSlideIdx);
+    } else if (activeMedia === 'video') {
+        rtcReceiver.stopReceiver();
+        screenshareLayer.style.display = 'none';
+        videoLayer.style.display = 'block';
+        handleVideoSync(state.video_state);
+    } else if (activeMedia === 'screenshare') {
+        screenshareLayer.style.display = 'block';
+        if (!rtcReceiver.hasRenderedWebRTC && (!canvasFallbackEl || canvasFallbackEl.style.display !== 'block')) {
+            if (loaderScreenshareEl) loaderScreenshareEl.style.display = 'flex';
+        }
+    } else if (activeMedia === 'whiteboard') {
+        rtcReceiver.stopReceiver();
+        screenshareLayer.style.display = 'none';
+        whiteboardLayer.style.display = 'block';
+    }
+
+    // 4. Sync Drawing Strokes
+    if (state.drawing_strokes) {
+        drawingEngine.syncAllStrokes(state.drawing_strokes);
+    }
+});
+
+function renderSlide(index) {
+    if (!currentSlides || currentSlides.length === 0) return;
+    const slide = currentSlides[index];
+    if (!slide) return;
+
+    // Clear old slide drawings so strokes don't bleed onto the new slide
+    if (currentSlideIndex !== index && currentSlideIndex !== -1) {
+        drawingEngine.clear();
+    }
+    currentSlideIndex = index;
+    if (slide.image_url) {
+        slideImg.src = slide.image_url;
+    }
+}
+
+// Laser Real-time Event (Letterbox aspect-ratio accurate across slides and screenshare)
+client.on('laser_move', (payload) => {
+    let targetEl = null;
+    if (slideLayer && slideLayer.style.display !== 'none' && slideImg) {
+        targetEl = slideImg;
+    } else if (screenshareLayer && screenshareLayer.style.display !== 'none') {
+        targetEl = (videoScreenshareEl && videoScreenshareEl.style.display !== 'none') ? videoScreenshareEl : canvasFallbackEl;
+    }
+    laserDisplay.update(payload.active, payload.x, payload.y, payload.color || '#ff2a5f', targetEl);
+});
+
+function toggleStreamAudio() {
+    if (!videoScreenshareEl) return;
+    videoScreenshareEl.muted = !videoScreenshareEl.muted;
+    const btn = document.getElementById('btn-unmute-stream');
+    if (btn) {
+        if (videoScreenshareEl.muted) {
+            btn.textContent = "🔇 Ovoz O'chiq";
+            btn.style.borderColor = '#ef4444';
+            btn.style.color = '#ef4444';
+        } else {
+            btn.textContent = "🔊 Ovoz Faol";
+            btn.style.borderColor = '#10b981';
+            btn.style.color = '#10b981';
+        }
+    }
+}
+
+// Drawing Real-time Events
+client.on('draw_stroke', (stroke) => {
+    drawingEngine.addRemoteStroke(stroke);
+});
+client.on('clear_drawings', () => {
+    drawingEngine.clear();
+});
+
+// Video Sync & Drift Correction (<0.3s tolerance)
+function handleVideoSync(videoState) {
+    if (!videoState || !videoState.src) return;
+
+    if (syncVideo.src !== window.location.origin + videoState.src && !syncVideo.src.endsWith(videoState.src)) {
+        syncVideo.src = videoState.src;
+    }
+
+    if (videoState.is_playing) {
+        // Drift check
+        const targetTime = videoState.current_time + (Date.now() / 1000 - videoState.last_updated_at);
+        if (Math.abs(syncVideo.currentTime - targetTime) > 0.35) {
+            syncVideo.currentTime = targetTime;
+        }
+        syncVideo.play().catch(e => console.warn('Autoplay blocked:', e));
+    } else {
+        syncVideo.pause();
+        if (Math.abs(syncVideo.currentTime - videoState.current_time) > 0.3) {
+            syncVideo.currentTime = videoState.current_time;
+        }
+    }
+}
+
+client.on('video_sync', (payload) => {
+    if (payload.is_playing) {
+        if (Math.abs(syncVideo.currentTime - payload.current_time) > 0.35) {
+            syncVideo.currentTime = payload.current_time;
+        }
+        syncVideo.play().catch(e => console.warn(e));
+    } else {
+        syncVideo.pause();
+        syncVideo.currentTime = payload.current_time;
+    }
+});
+
+// Announcement Banner
+client.on('show_banner', ({ text, duration }) => {
+    bannerEl.textContent = text;
+    bannerEl.style.display = 'block';
+    setTimeout(() => {
+        bannerEl.style.display = 'none';
+    }, (duration || 8) * 1000);
+});
+
+// Smart Board Floating Toolbar Interactions (Clean Viewport: Never Obstructs Slides)
+let toolbarHideTimeout = null;
+function showToolbarTemporarily(durationMs = 3500) {
+    toolbar.classList.remove('autohide');
+    clearTimeout(toolbarHideTimeout);
+    toolbarHideTimeout = setTimeout(() => {
+        toolbar.classList.add('autohide');
+    }, durationMs);
+}
+const resetToolbarTimer = showToolbarTemporarily;
+
+// Only reveal toolbar when touching or hovering near the bottom 60px of the screen
+window.addEventListener('pointermove', (e) => {
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    if (e.clientY > window.innerHeight - 60) {
+        showToolbarTemporarily();
+    }
+});
+window.addEventListener('pointerdown', (e) => {
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    if (e.clientY > window.innerHeight - 60 || e.target.closest('#smart-toolbar') || e.target.closest('#toolbar-reveal-handle')) {
+        showToolbarTemporarily();
+    }
+});
+// Hide toolbar by default to keep slide presentation 100% clean
+toolbar.classList.add('autohide');
+
+// Tool Buttons
+const toolPointer = document.getElementById('btn-tool-pointer');
+const toolPen = document.getElementById('btn-tool-pen');
+const toolHighlighter = document.getElementById('btn-tool-highlighter');
+const toolEraser = document.getElementById('btn-tool-eraser');
+
+function setActiveTool(btn, tool, isDrawing) {
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    document.querySelectorAll('.floating-smart-toolbar .tool-btn').forEach(b => {
+        if (b.id.startsWith('btn-tool-') && b.id !== 'btn-tool-clear') b.classList.remove('active');
+    });
+    btn.classList.add('active');
+    drawingEngine.setInteractive(isDrawing);
+    if (tool) drawingEngine.activeTool = tool;
+}
+
+toolPointer.onclick = () => setActiveTool(toolPointer, null, false);
+toolPen.onclick = () => { setActiveTool(toolPen, 'pen', true); drawingEngine.activeColor = '#ff2a5f'; drawingEngine.activeWidth = 5; };
+toolHighlighter.onclick = () => { setActiveTool(toolHighlighter, 'highlighter', true); drawingEngine.activeColor = '#fbbf24'; };
+toolEraser.onclick = () => { setActiveTool(toolEraser, 'eraser', true); };
+document.getElementById('btn-tool-clear').onclick = () => {
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    drawingEngine.clear();
+    client.clearDrawings();
+};
+
+document.getElementById('btn-touch-prev').onclick = () => {
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    client.prevSlide();
+};
+document.getElementById('btn-touch-next').onclick = () => {
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    client.nextSlide();
+};
+document.getElementById('btn-fullscreen').onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => console.warn(err));
+    } else {
+        document.exitFullscreen().catch(err => console.warn(err));
+    }
+};
+
+// Touch-to-Advance Smart Board interaction:
+// In Pointer mode (👆), touching the screen advances or steps back the slide
+slideLayer.addEventListener('pointerup', (e) => {
+    // If sensor/touch is locked by teacher, ignore completely (Palm/body rejection)
+    if (window.currentRoomState && window.currentRoomState.touch_locked) return;
+    // If user is currently drawing with pen/highlighter, don't advance
+    if (drawingEngine.interactive) return;
+    // If screen is locked by teacher, ignore
+    if (document.getElementById('locked-shield-overlay').style.display === 'flex') return;
+    // Don't trigger if click was on toolbar or header badge
+    if (e.target.closest('#smart-toolbar') || e.target.closest('#screen-badge') || e.target.closest('#toolbar-reveal-handle')) return;
+
+    const rect = slideLayer.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    if (clickX < rect.width * 0.25) {
+        client.prevSlide();
+    } else {
+        client.nextSlide();
+    }
+});
+
+// Hardware Physical USB Clicker & Remote Presentation Dongle Handler (Keyboard HID)
+// Works 100% reliably EVEN WHEN TOUCH SENSOR IS LOCKED!
+window.addEventListener('keydown', (e) => {
+    // If locked by full teacher lock shield, ignore
+    const lockedShield = document.getElementById('locked-shield-overlay');
+    if (lockedShield && lockedShield.style.display === 'flex') return;
+
+    const key = e.key;
+
+    // 1. Next slide signals (PageDown, ArrowRight, ArrowDown, Space, n, N)
+    if (key === 'PageDown' || key === 'ArrowRight' || key === 'ArrowDown' || key === ' ' || key === 'n' || key === 'N') {
+        e.preventDefault();
+        client.nextSlide();
+    }
+    // 2. Previous slide signals (PageUp, ArrowLeft, ArrowUp, p, P)
+    else if (key === 'PageUp' || key === 'ArrowLeft' || key === 'ArrowUp' || key === 'p' || key === 'P') {
+        e.preventDefault();
+        client.prevSlide();
+    }
+    // 3. Blackout signals (b, B, .)
+    else if (key === 'b' || key === 'B' || key === '.') {
+        e.preventDefault();
+        client.sendRaw({ type: 'TOGGLE_BLACKOUT' });
+    }
+    // 4. Start from slide 1 (F5, Shift+F5)
+    else if (key === 'F5') {
+        e.preventDefault();
+        client.changeSlide(0);
+    }
+    // 5. Exit fullscreen (Escape)
+    else if (key === 'Escape') {
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(err => console.warn(err));
+        }
+    }
+});
+
+// RGB Screen Health Test Handler
+client.on('rgb_test', () => {
+    const overlay = document.getElementById('rgb-test-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'block';
+    
+    const colors = ['#ef4444', '#10b981', '#3b82f6', '#ffffff'];
+    let idx = 0;
+    overlay.style.backgroundColor = colors[0];
+    
+    const interval = setInterval(() => {
+        idx++;
+        if (idx < colors.length) {
+            overlay.style.backgroundColor = colors[idx];
+        } else {
+            clearInterval(interval);
+            overlay.style.display = 'none';
+        }
+    }, 1000);
+});
+</script>
+{% endblock %}
+

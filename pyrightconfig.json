@@ -1,0 +1,18 @@
+{
+  "include": ["app", "tests", "run.py"],
+  "extraPaths": [
+    ".",
+    "C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages",
+    "C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\site-packages"
+  ],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        ".",
+        "C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages",
+        "C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python314\\Lib\\site-packages"
+      ]
+    }
+  ]
+}
