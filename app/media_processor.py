@@ -132,6 +132,77 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
     raise RuntimeError("No working PDF rendering engine found.")
 
 
+def find_soffice_binary() -> Optional[str]:
+    """Finds LibreOffice soffice binary across PATH and standard OS locations."""
+    # 1. System PATH
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        return soffice
+    
+    # 2. Windows locations
+    if os.name == "nt":
+        candidates = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+            r"D:\Program Files\LibreOffice\program\soffice.exe"
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+
+    # 3. Linux locations
+    for p in ["/usr/bin/libreoffice", "/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice"]:
+        if os.path.exists(p):
+            return p
+            
+    return None
+
+
+def convert_to_pdf_with_libreoffice(input_path: Path, out_dir: Path) -> Optional[Path]:
+    """Converts PPTX/DOCX to Vector PDF using headless LibreOffice with isolated profile."""
+    soffice = find_soffice_binary()
+    if not soffice:
+        return None
+    try:
+        import subprocess
+        profile_dir = Path("/tmp/ddds_lo_profile") if os.name != "nt" else Path(os.environ.get("TEMP", ".")) / "ddds_lo"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        profile_uri = profile_dir.as_uri()
+
+        cmd = [
+            soffice,
+            "--headless",
+            "--invisible",
+            "--nocrashreport",
+            "--nodefault",
+            "--nofirststartwizard",
+            "--nologo",
+            "--norestore",
+            f"-env:UserInstallation={profile_uri}",
+            "--convert-to", "pdf",
+            str(input_path.resolve()),
+            "--outdir", str(out_dir.resolve())
+        ]
+        env = os.environ.copy()
+        env["HOME"] = "/tmp" if os.name != "nt" else env.get("USERPROFILE", "")
+        env["SAL_USE_VCLPLUGIN"] = "gen"
+
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45, env=env)
+        if proc.returncode != 0:
+            print(f"[MediaProcessor] LibreOffice code {proc.returncode}: {proc.stderr.decode('utf-8', errors='ignore')}")
+
+        # Check for expected pdf
+        expected = out_dir / f"{input_path.stem}.pdf"
+        if expected.exists() and expected.stat().st_size > 0:
+            return expected
+        for p in out_dir.glob("*.pdf"):
+            if p.stat().st_size > 0:
+                return p
+    except Exception as e:
+        print(f"[MediaProcessor] LibreOffice conversion exception: {e}")
+    return None
+
+
 def process_pptx_file(file_bytes: bytes, filename: str, room_id: str) -> List[SlideItem]:
     """
     Renders PowerPoint slides 100% UNCHANGED with ULTRA-HD clarity
@@ -166,10 +237,9 @@ def process_pptx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
                         titles_per_slide[idx] = shape.text_frame.text.strip()[:60]
                         break
         except Exception as e:
-            print(f"[MediaProcessor] python-pptx parse error: {e}")
+            print(f"[MediaProcessor] python-pptx parse warning: {e}")
 
-    # 2. Convert PPTX to Vector PDF using PowerPoint COM (Format 32)
-    # This preserves all fonts, equations, shapes and layout losslessly in vector format!
+    # 2. Convert PPTX to Vector PDF using PowerPoint COM (Format 32) on Windows
     pdf_converted = pptx_cache_dir / "presentation.pdf"
     if HAS_WIN32COM and not pdf_converted.exists():
         ppt_app = None
@@ -179,29 +249,31 @@ def process_pptx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
             ppt_app = win32com.client.Dispatch("PowerPoint.Application")
             abs_pptx = str(temp_pptx.resolve())
             abs_pdf = str(pdf_converted.resolve())
-            
-            pres = ppt_app.Presentations.Open(abs_pptx, WithWindow=False)
+            try:
+                pres = ppt_app.Presentations.Open(abs_pptx, ReadOnly=1, Untitled=0, WithWindow=0)
+            except Exception:
+                pres = ppt_app.Presentations.Open(abs_pptx)
             # 32 = ppSaveAsPDF (Vector lossless)
             pres.SaveAs(abs_pdf, 32)
         except Exception as e:
-            print(f"[MediaProcessor] PowerPoint COM PDF export failed: {e}")
+            print(f"[MediaProcessor] PowerPoint COM PDF export error: {e}")
         finally:
             if pres:
-                try:
-                    pres.Close()
-                except Exception:
-                    pass
+                try: pres.Close()
+                except Exception: pass
             if ppt_app:
-                try:
-                    ppt_app.Quit()
-                except Exception:
-                    pass
-            try:
-                pythoncom.CoUninitialize()
-            except Exception:
-                pass
+                try: ppt_app.Quit()
+                except Exception: pass
+            try: pythoncom.CoUninitialize()
+            except Exception: pass
 
-    # 3. If PDF was generated, render with Ultra-HD pypdfium2 at scale 3.0 (300 DPI)
+    # 3. Fallback: Try LibreOffice headless (Linux & Windows)
+    if not (pdf_converted.exists() and pdf_converted.stat().st_size > 0):
+        lo_pdf = convert_to_pdf_with_libreoffice(temp_pptx, pptx_cache_dir)
+        if lo_pdf:
+            pdf_converted = lo_pdf
+
+    # 4. If PDF was generated by either engine, render with Ultra-HD pypdfium2 at scale 3.0 (300 DPI)
     if pdf_converted.exists() and pdf_converted.stat().st_size > 0:
         slides = process_pdf_file(pdf_converted.read_bytes(), filename, room_id)
         # Attach extracted notes and titles
@@ -212,27 +284,6 @@ def process_pptx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
                 s.title = titles_per_slide[s.index]
             s.slide_type = "pptx_card"
         return slides
-
-    # 4. Fallback: Try LibreOffice headless
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if soffice:
-        try:
-            import subprocess
-            subprocess.run([
-                soffice, "--headless", "--convert-to", "pdf",
-                str(temp_pptx), "--outdir", str(pptx_cache_dir)
-            ], check=True, timeout=30)
-            if pdf_converted.exists():
-                slides = process_pdf_file(pdf_converted.read_bytes(), filename, room_id)
-                for s in slides:
-                    if s.index in notes_per_slide:
-                        s.speaker_notes = notes_per_slide[s.index]
-                    if s.index in titles_per_slide:
-                        s.title = titles_per_slide[s.index]
-                    s.slide_type = "pptx_card"
-                return slides
-        except Exception as e:
-            print(f"[MediaProcessor] LibreOffice fallback failed: {e}")
 
     # 5. Last resort fallback to clean presentation builder
     return build_fallback_pptx_slides(temp_pptx, filename, room_id, file_hash)
@@ -253,33 +304,31 @@ def process_docx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
     temp_doc.write_bytes(file_bytes)
     pdf_converted = doc_cache_dir / "document.pdf"
 
-    # 1. Primary: LibreOffice headless (Works on Linux, Docker, Windows)
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if soffice:
-        try:
-            import subprocess
-            subprocess.run([
-                soffice, "--headless", "--convert-to", "pdf",
-                str(temp_doc), "--outdir", str(doc_cache_dir)
-            ], check=True, timeout=40)
-        except Exception as e:
-            print(f"[MediaProcessor] LibreOffice Word conversion error: {e}")
+    # 1. Primary: LibreOffice headless (Linux, Docker, Windows)
+    lo_pdf = convert_to_pdf_with_libreoffice(temp_doc, doc_cache_dir)
+    if lo_pdf:
+        pdf_converted = lo_pdf
 
     # 2. Secondary: Windows Word COM (if on Windows)
-    if not pdf_converted.exists() and HAS_WIN32COM:
+    if not (pdf_converted.exists() and pdf_converted.stat().st_size > 0) and HAS_WIN32COM:
         word_app = None
         doc = None
         try:
             pythoncom.CoInitialize()
             word_app = win32com.client.Dispatch("Word.Application")
-            doc = word_app.Documents.Open(str(temp_doc.resolve()))
+            abs_doc = str(temp_doc.resolve())
+            abs_pdf = str(pdf_converted.resolve())
+            try:
+                doc = word_app.Documents.Open(abs_doc, ReadOnly=True, Visible=False)
+            except Exception:
+                doc = word_app.Documents.Open(abs_doc)
             # 17 = wdFormatPDF
-            doc.SaveAs(str(pdf_converted.resolve()), 17)
+            doc.SaveAs(abs_pdf, 17)
         except Exception as e:
             print(f"[MediaProcessor] Word COM PDF export failed: {e}")
         finally:
             if doc:
-                try: doc.Close()
+                try: doc.Close(SaveChanges=False)
                 except Exception: pass
             if word_app:
                 try: word_app.Quit()
@@ -292,7 +341,7 @@ def process_docx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
         slides = process_pdf_file(pdf_converted.read_bytes(), filename, room_id)
         for s in slides:
             s.slide_type = "word_doc"
-            s.title = f"{Path(filename).stem} (Hujjat {s.index + 1}-bet)"
+            s.title = f"{Path(filename).stem} ({s.index + 1}-bet)"
         return slides
 
     raise RuntimeError("Word hujjatini PDF formatiga o'tkazish imkoni bo'lmadi. Serverda LibreOffice kerak.")

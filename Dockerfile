@@ -4,18 +4,23 @@ FROM python:3.11-slim
 # Prevent Python from writing .pyc and buffer stdout
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV HOME=/tmp
+ENV SAL_USE_VCLPLUGIN=gen
 
 WORKDIR /app
 
 # Install system dependencies:
 # - build-essential, curl
-# - libreoffice-writer, libreoffice-impress (headless docx & pptx conversion)
+# - libreoffice-writer, libreoffice-impress, libreoffice-common (headless docx & pptx conversion)
 # - fonts-liberation, fonts-dejavu-core, fonts-noto-core (flawless Cyrillic/Latin typography)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    libreoffice-common \
     libreoffice-writer \
     libreoffice-impress \
+    libreoffice-calc \
+    default-jre-headless \
     fonts-liberation \
     fonts-dejavu-core \
     fonts-noto-core \

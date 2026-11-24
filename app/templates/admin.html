@@ -273,19 +273,19 @@
             <!-- Left: Upload Zone -->
             <div style="display: flex; flex-direction: column; gap: 14px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="font-size: 1rem; font-weight: 700;">📥 Yangi Taqdimot Yuklash</h3>
-                    <span class="badge badge-primary">PPTX, PDF, PNG, JPG, MP4</span>
+                    <h3 style="font-size: 1rem; font-weight: 700;">📥 Yangi Taqdimot / Hujjat Yuklash</h3>
+                    <span class="badge badge-primary">PPTX, WORD, PDF, PNG, MP4</span>
                 </div>
 
                 <div class="upload-dropzone-box" onclick="document.getElementById('deck-file-input').click()">
                     <div class="dropzone-folder-icon">📁</div>
                     <div style="font-weight: 700; font-size: 1rem; color: white; margin-bottom: 4px;">
-                        Taqdimot faylini bu yerga tashlang yoki tanlang
+                        Taqdimot yoki Word hujjatini bu yerga tashlang yoki tanlang
                     </div>
                     <div style="font-size: 0.82rem; color: #64748b;">
-                        PowerPoint (.pptx, .ppt) yoki PDF (200 MB gacha)
+                        PowerPoint (.pptx, .ppt), Word (.docx, .doc) yoki PDF (200 MB gacha)
                     </div>
-                    <input type="file" id="deck-file-input" accept=".pptx,.ppt,.pdf,.png,.jpg,.jpeg,.mp4" style="display: none;" onchange="uploadPresentationFile(event)">
+                    <input type="file" id="deck-file-input" accept=".pptx,.ppt,.pdf,.docx,.doc,.png,.jpg,.jpeg,.mp4" style="display: none;" onchange="uploadPresentationFile(event)">
                 </div>
 
                 <div>

@@ -372,7 +372,9 @@ class WebRTCReceiver {
         this.fallbackCtx = this.fallbackCanvas ? this.fallbackCanvas.getContext('2d') : null;
         this.loaderEl = loaderElement;
         this.peerConnection = null;
-        this.remoteStream = null;
+        this.videoStream = null;
+        this.audioStream = null;
+        this.audioEl = null;
         this.pendingCandidates = [];
         this.isConnecting = false;
         this.connectTimeout = null;
@@ -462,7 +464,7 @@ class WebRTCReceiver {
                     screen_id: this.client.clientId
                 });
             }
-        }, 2000);
+        }, 5000);
     }
 
     async handleOffer(payload) {
@@ -476,28 +478,48 @@ class WebRTCReceiver {
             try { this.peerConnection.close(); } catch (e) {}
         }
 
-        // Initialize unified remote media stream
-        if (this.remoteStream) {
-            this.remoteStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+        // Initialize decoupled streams
+        if (this.videoStream) {
+            this.videoStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
         }
-        this.remoteStream = new MediaStream();
+        this.videoStream = new MediaStream();
+
+        if (this.audioStream) {
+            this.audioStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+        }
+        this.audioStream = new MediaStream();
+
+        // Ensure independent audio element exists
+        if (!this.audioEl) {
+            this.audioEl = document.getElementById('webrtc-stream-audio');
+            if (!this.audioEl) {
+                this.audioEl = document.createElement('audio');
+                this.audioEl.id = 'webrtc-stream-audio';
+                this.audioEl.style.display = 'none';
+                document.body.appendChild(this.audioEl);
+            }
+        }
+        this.audioEl.autoplay = true;
+        this.audioEl.srcObject = this.audioStream;
+        // Screen 2 is muted to avoid acoustic feedback; Screen 1 plays audio
+        this.audioEl.muted = (this.client.role === 'screen_2');
 
         if (this.videoEl) {
-            // Screen 1 allows audio; Screen 2 is muted to avoid acoustic feedback
-            this.videoEl.muted = (this.client.role === 'screen_2');
+            // CRITICAL: Video element MUST ALWAYS remain muted!
+            // Decoupling audio from video guarantees Chromium Autoplay Policy never freezes video after 2 seconds!
+            this.videoEl.muted = true;
             this.videoEl.playsInline = true;
             this.videoEl.autoplay = true;
-            this.videoEl.srcObject = this.remoteStream;
+            this.videoEl.srcObject = this.videoStream;
         }
 
         this.peerConnection = new RTCPeerConnection(this.rtcConfig);
 
         this.peerConnection.ontrack = (event) => {
             console.log(`[WebRTC Receiver] Track received: ${event.track.kind}`, event.track);
-            // Append track to unified stream (handles both video and audio without clobbering)
-            this.remoteStream.addTrack(event.track);
 
             if (event.track.kind === 'video' && this.videoEl) {
+                this.videoStream.addTrack(event.track);
                 this.videoEl.style.display = 'block';
 
                 const onFrameReady = () => {
@@ -523,8 +545,25 @@ class WebRTCReceiver {
                     onFrameReady();
                 };
             } else if (event.track.kind === 'audio') {
+                this.audioStream.addTrack(event.track);
+                if (this.audioEl && !this.audioEl.muted) {
+                    this.audioEl.play().catch(err => {
+                        console.warn('[WebRTC Receiver] Audio autoplay paused by policy, click unmute:', err);
+                    });
+                }
                 const unmuteBtn = document.getElementById('btn-unmute-stream');
-                if (unmuteBtn) unmuteBtn.style.display = 'inline-flex';
+                if (unmuteBtn) {
+                    unmuteBtn.style.display = 'inline-flex';
+                    if (this.audioEl && this.audioEl.muted) {
+                        unmuteBtn.textContent = "🔇 Ovoz O'chiq";
+                        unmuteBtn.style.borderColor = '#ef4444';
+                        unmuteBtn.style.color = '#ef4444';
+                    } else {
+                        unmuteBtn.textContent = "🔊 Ovoz Faol";
+                        unmuteBtn.style.borderColor = '#10b981';
+                        unmuteBtn.style.color = '#10b981';
+                    }
+                }
             }
         };
 
@@ -591,6 +630,15 @@ class WebRTCReceiver {
         }
     }
 
+    toggleAudio() {
+        if (!this.audioEl) return false;
+        this.audioEl.muted = !this.audioEl.muted;
+        if (!this.audioEl.muted) {
+            this.audioEl.play().catch(() => {});
+        }
+        return !this.audioEl.muted;
+    }
+
     handleFallbackFrame(payload) {
         if (!payload || !payload.frame) return;
         // If WebRTC is actively playing video frames, skip canvas drawing to save CPU
@@ -611,7 +659,7 @@ class WebRTCReceiver {
             }
             this.fallbackCtx.drawImage(img, 0, 0);
             this.fallbackCanvas.style.display = 'block';
-            if (this.videoEl && (!this.hasRenderedWebRTC || this.videoEl.paused)) {
+            if (this.videoEl && !this.hasRenderedWebRTC) {
                 this.videoEl.style.display = 'none';
             }
             if (this.loaderEl) {
@@ -626,9 +674,16 @@ class WebRTCReceiver {
             try { this.peerConnection.close(); } catch (e) {}
             this.peerConnection = null;
         }
-        if (this.remoteStream) {
-            this.remoteStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
-            this.remoteStream = null;
+        if (this.videoStream) {
+            this.videoStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+            this.videoStream = null;
+        }
+        if (this.audioStream) {
+            this.audioStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+            this.audioStream = null;
+        }
+        if (this.audioEl) {
+            this.audioEl.srcObject = null;
         }
         this.pendingCandidates = [];
         this.isConnecting = false;

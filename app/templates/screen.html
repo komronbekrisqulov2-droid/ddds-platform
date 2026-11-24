@@ -244,11 +244,16 @@ client.on('laser_move', (payload) => {
 });
 
 function toggleStreamAudio() {
-    if (!videoScreenshareEl) return;
-    videoScreenshareEl.muted = !videoScreenshareEl.muted;
+    let isUnmuted = false;
+    if (rtcReceiver && typeof rtcReceiver.toggleAudio === 'function') {
+        isUnmuted = rtcReceiver.toggleAudio();
+    } else if (videoScreenshareEl) {
+        videoScreenshareEl.muted = !videoScreenshareEl.muted;
+        isUnmuted = !videoScreenshareEl.muted;
+    }
     const btn = document.getElementById('btn-unmute-stream');
     if (btn) {
-        if (videoScreenshareEl.muted) {
+        if (!isUnmuted) {
             btn.textContent = "🔇 Ovoz O'chiq";
             btn.style.borderColor = '#ef4444';
             btn.style.color = '#ef4444';
