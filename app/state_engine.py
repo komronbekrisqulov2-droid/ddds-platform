@@ -4,12 +4,12 @@ import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import WebSocket
 
-from app.config import DEFAULT_ROOMS
+from app.config import DEFAULT_ROOMS, CACHE_DIR, UPLOADS_DIR
 from app.models import (
     RoomState, ScreenState, LaserState, DrawingStroke, VideoSyncState,
     DisplayMode, MediaType, ClientRole, ConnectedClient, SlideItem, PresentationDeck
 )
-from app.media_processor import get_default_starter_slides
+from app.media_processor import get_default_starter_slides, get_whiteboard_permanent_slides
 
 
 class RoomStateManager:
@@ -32,12 +32,23 @@ class RoomStateManager:
             r_id = room_def["id"]
             starter_slides = get_default_starter_slides(r_id, room_def["name"])
             starter_deck = PresentationDeck(
-                id="deck_parallel_7",
-                name="7-maruza_Parallel_dasturlar_unumdorligini_baholash",
+                id="deck_smart_starter",
+                name="DDDS_Smart_Taqdimot",
                 format="pptx",
                 slide_count=len(starter_slides),
                 slides=starter_slides,
-                is_active=True
+                is_active=True,
+                is_permanent=False
+            )
+            wb_slides = get_whiteboard_permanent_slides(r_id)
+            whiteboard_deck = PresentationDeck(
+                id="deck_whiteboard_permanent",
+                name="📋 Interaktiv Oq Doska",
+                format="whiteboard",
+                slide_count=len(wb_slides),
+                slides=wb_slides,
+                is_active=False,
+                is_permanent=True
             )
             self.rooms[r_id] = RoomState(
                 room_id=r_id,
@@ -50,9 +61,11 @@ class RoomStateManager:
                 slides=starter_slides,
                 active_deck_name=starter_deck.name,
                 active_deck_id=starter_deck.id,
-                saved_decks=[starter_deck],
+                saved_decks=[starter_deck, whiteboard_deck],
                 screen1=ScreenState(label="1-Smart Monitor (Chap)", slide_index=0),
-                screen2=ScreenState(label="2-Smart Monitor (O'ng)", slide_index=0 if DisplayMode.MIRROR else 1)
+                screen2=ScreenState(label="2-Smart Monitor (O'ng)", slide_index=0 if DisplayMode.MIRROR else 1),
+                screen3=ScreenState(label="3-Smart Monitor", slide_index=0),
+                screen4=ScreenState(label="4-Smart Monitor", slide_index=0)
             )
             self.active_sockets[r_id] = {}
 
@@ -69,6 +82,25 @@ class RoomStateManager:
             return room
 
         starter_slides = get_default_starter_slides(room_id, name)
+        starter_deck = PresentationDeck(
+            id="deck_smart_starter",
+            name="DDDS_Smart_Taqdimot",
+            format="pptx",
+            slide_count=len(starter_slides),
+            slides=starter_slides,
+            is_active=True,
+            is_permanent=False
+        )
+        wb_slides = get_whiteboard_permanent_slides(room_id)
+        whiteboard_deck = PresentationDeck(
+            id="deck_whiteboard_permanent",
+            name="📋 Interaktiv Oq Doska",
+            format="whiteboard",
+            slide_count=len(wb_slides),
+            slides=wb_slides,
+            is_active=False,
+            is_permanent=True
+        )
         room = RoomState(
             room_id=room_id,
             room_name=name,
@@ -76,8 +108,13 @@ class RoomStateManager:
             description=description,
             version=1,
             slides=starter_slides,
+            active_deck_name=starter_deck.name,
+            active_deck_id=starter_deck.id,
+            saved_decks=[starter_deck, whiteboard_deck],
             screen1=ScreenState(label="1-Smart Monitor (Chap)", slide_index=0),
-            screen2=ScreenState(label="2-Smart Monitor (O'ng)", slide_index=0)
+            screen2=ScreenState(label="2-Smart Monitor (O'ng)", slide_index=0),
+            screen3=ScreenState(label="3-Smart Monitor", slide_index=0),
+            screen4=ScreenState(label="4-Smart Monitor", slide_index=0)
         )
         self.rooms[room_id] = room
         if room_id not in self.active_sockets:
@@ -410,14 +447,21 @@ class RoomStateManager:
             format=format_type,
             slide_count=len(slides),
             slides=slides,
-            is_active=True
+            is_active=True,
+            is_permanent=False
         )
 
         # Mark all other decks inactive
         for d in room.saved_decks:
             d.is_active = False
+
+        # Enforce memory retention limit: Keep at most 4 uploaded non-permanent decks (+ permanent whiteboard)
+        non_perm = [d for d in room.saved_decks if not getattr(d, 'is_permanent', False)]
+        while len(non_perm) >= 4:
+            oldest = non_perm.pop(0)
+            room.saved_decks = [d for d in room.saved_decks if d.id != oldest.id]
         
-        # Add to portfolio
+        # Add new deck to portfolio
         room.saved_decks.append(new_deck)
 
         # Set as currently active
@@ -457,6 +501,12 @@ class RoomStateManager:
         room = self.rooms.get(room_id)
         if not room:
             return
+        
+        # Prevent deletion of permanent whiteboard
+        deck = next((d for d in room.saved_decks if d.id == deck_id), None)
+        if deck and getattr(deck, 'is_permanent', False):
+            return
+
         room.saved_decks = [d for d in room.saved_decks if d.id != deck_id]
         # If we deleted the active deck, activate the first available
         if room.active_deck_id == deck_id and room.saved_decks:
@@ -468,11 +518,15 @@ class RoomStateManager:
         room = self.rooms.get(room_id)
         if not room:
             return
-        room.saved_decks = []
-        room.slides = []
-        room.active_deck_name = "Taqdimotlar mavjud emas"
-        room.active_deck_id = None
-        await self.broadcast_state(room_id, reason="PORTFOLIO_CLEARED")
+        # Keep permanent decks (e.g. permanent whiteboard)
+        room.saved_decks = [d for d in room.saved_decks if getattr(d, 'is_permanent', False)]
+        if room.saved_decks:
+            await self.activate_deck(room_id, room.saved_decks[0].id)
+        else:
+            room.slides = []
+            room.active_deck_name = "Taqdimotlar mavjud emas"
+            room.active_deck_id = None
+            await self.broadcast_state(room_id, reason="PORTFOLIO_CLEARED")
 
     async def add_text_slide_to_active(self, room_id: str, title: str, content: str):
         room = self.rooms.get(room_id)

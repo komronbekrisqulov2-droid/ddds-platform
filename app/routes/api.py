@@ -1,12 +1,18 @@
 import io
+import time
+import uuid
+import json
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response, Request
 from pydantic import BaseModel
 
-from app.config import UPLOADS_DIR, PDF_EXTENSIONS, PRESENTATION_EXTENSIONS, VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
+from app.config import (
+    UPLOADS_DIR, DATA_DIR, PDF_EXTENSIONS, PRESENTATION_EXTENSIONS, 
+    DOCUMENT_EXTENSIONS, VIDEO_EXTENSIONS, IMAGE_EXTENSIONS
+)
 from app.state_engine import state_manager
-from app.media_processor import process_pdf_file, process_pptx_file, get_default_starter_slides
+from app.media_processor import process_pdf_file, process_pptx_file, process_docx_file, get_default_starter_slides
 from app.qr_service import generate_qr_png_bytes, generate_qr_data_uri
 from app.models import SlideItem, MediaType
 
@@ -153,7 +159,15 @@ async def upload_lecture_media(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"PowerPoint qayta ishlashda xatolik: {e}")
 
-    # 3. Video File Processing
+    # 3. Word Document (.docx, .doc) Processing
+    elif ext in DOCUMENT_EXTENSIONS:
+        format_type = "docx"
+        try:
+            slides = process_docx_file(content, filename, room_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Word hujjatini qayta ishlashda xatolik: {e}")
+
+    # 4. Video File Processing
     elif ext in VIDEO_EXTENSIONS:
         upload_dir = UPLOADS_DIR / room_id
         upload_dir.mkdir(parents=True, exist_ok=True)
@@ -256,4 +270,39 @@ def get_room_qr_image(room_id: str, request: Request):
     join_url = f"{base_url}/join/{room_id}"
     png_bytes = generate_qr_png_bytes(join_url, box_size=12, border=2)
     return Response(content=png_bytes, media_type="image/png")
+
+
+class FeedbackRequest(BaseModel):
+    name: str
+    role: str = "O'qituvchi / Talaba"
+    contact: Optional[str] = ""
+    message: str
+
+
+@api_router.post("/feedback")
+async def submit_feedback(req: FeedbackRequest, request: Request):
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Fikr yoki taklif matni bo'sh bo'lishi mumkin emas")
+    
+    feedback_file = DATA_DIR / "feedback.json"
+    items = []
+    if feedback_file.exists():
+        try:
+            items = json.loads(feedback_file.read_text(encoding="utf-8"))
+        except Exception:
+            items = []
+    
+    new_item = {
+        "id": str(uuid.uuid4())[:8],
+        "name": req.name.strip() or "Foydalanuvchi",
+        "role": req.role.strip() or "O'qituvchi",
+        "contact": req.contact.strip() if req.contact else "",
+        "message": req.message.strip(),
+        "timestamp": time.time(),
+        "date_str": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "client_ip": request.client.host if request.client else "unknown"
+    }
+    items.append(new_item)
+    feedback_file.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"status": "ok", "message": "Taklifingiz muallifga muvaffaqiyatli yetkazildi! Rahmat ✨"}
 

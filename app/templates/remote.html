@@ -52,6 +52,23 @@
         <img id="remote-slide-thumb" src="" alt="Joriy slayd" style="width: 100%; height: 110px; object-fit: contain; display: block;">
     </div>
 
+    <!-- Zoom & Document Pan Controls (Word & Formula Detail) -->
+    <div class="remote-zoom-card" style="background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 10px 14px; margin: 8px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+                <span>🔍</span> <span>Kattalashtirish (Zoom & Scroll)</span>
+            </span>
+            <span id="remote-zoom-label" style="font-size: 0.8rem; font-weight: 800; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 8px; border-radius: 9999px;">100%</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn btn-secondary" style="flex: 1; padding: 8px 4px; font-size: 0.85rem;" onclick="handleRemoteZoom(-0.25)">🔍-</button>
+            <button class="btn btn-secondary" style="flex: 1; padding: 8px 4px; font-size: 0.85rem;" onclick="handleRemoteZoom(0, true)">100%</button>
+            <button class="btn btn-primary" style="flex: 1; padding: 8px 4px; font-size: 0.85rem;" onclick="handleRemoteZoom(0.25)">🔍+</button>
+            <button class="btn btn-secondary" style="padding: 8px 12px; font-size: 0.85rem;" title="Yuqoriga surish" onclick="handleRemotePan(0, -80)">▲</button>
+            <button class="btn btn-secondary" style="padding: 8px 12px; font-size: 0.85rem;" title="Pastga surish" onclick="handleRemotePan(0, 80)">▼</button>
+        </div>
+    </div>
+
     <!-- Screenshare Live Indicator on Phone Remote -->
     <div id="remote-screenshare-indicator" style="display: none; background: rgba(220, 38, 38, 0.15); border: 1.5px solid #ef4444; border-radius: 12px; padding: 12px; margin: 8px 0; text-align: center; color: white;">
         <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -219,6 +236,13 @@ client.on('sync_state', ({ state }) => {
     if (scIndicator) scIndicator.style.display = isScreenshare ? 'block' : 'none';
     if (thumbBox) thumbBox.style.display = isScreenshare ? 'none' : 'block';
 
+    // Zoom state
+    const zoomLbl = document.getElementById('remote-zoom-label');
+    if (zoomLbl) zoomLbl.textContent = Math.round((state.zoom_level || 1.0) * 100) + '%';
+    currentRemoteZoom = state.zoom_level || 1.0;
+    currentRemotePanX = state.pan_x || 0.0;
+    currentRemotePanY = state.pan_y || 0.0;
+
     // Blackout
     if (state.blackout) {
         btnRemoteBlackout.classList.add('blackout-active');
@@ -275,6 +299,32 @@ function toggleNotesAccordion() {
     notesExpanded = !notesExpanded;
     body.style.display = notesExpanded ? 'block' : 'none';
     chevron.textContent = notesExpanded ? '▼' : '▲';
+}
+
+// Remote Zoom & Pan Handlers (Word reading & Detail magnification)
+let currentRemoteZoom = 1.0;
+let currentRemotePanX = 0;
+let currentRemotePanY = 0;
+
+function handleRemoteZoom(delta, reset = false) {
+    vibrateHaptic();
+    if (reset) {
+        currentRemoteZoom = 1.0;
+        currentRemotePanX = 0;
+        currentRemotePanY = 0;
+    } else {
+        currentRemoteZoom = Math.max(0.75, Math.min(3.5, currentRemoteZoom + delta));
+    }
+    const lbl = document.getElementById('remote-zoom-label');
+    if (lbl) lbl.textContent = Math.round(currentRemoteZoom * 100) + '%';
+    client.setZoom(currentRemoteZoom, currentRemotePanX, currentRemotePanY);
+}
+
+function handleRemotePan(dx, dy) {
+    vibrateHaptic();
+    currentRemotePanX += dx;
+    currentRemotePanY += dy;
+    client.setZoom(currentRemoteZoom, currentRemotePanX, currentRemotePanY);
 }
 </script>
 {% endblock %}

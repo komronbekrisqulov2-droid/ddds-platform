@@ -42,12 +42,13 @@ async def lobby_page(request: Request):
 
 @views_router.get("/screen/{room_id}/{screen_num}", response_class=HTMLResponse)
 async def screen_kiosk_page(request: Request, room_id: str, screen_num: int):
-    if screen_num not in (1, 2):
-        raise HTTPException(status_code=400, detail="Monitor raqami 1 yoki 2 bo'lishi kerak")
+    if screen_num not in (1, 2, 3, 4):
+        raise HTTPException(status_code=400, detail="Monitor raqami 1 dan 4 gacha bo'lishi kerak")
 
     room = get_or_404_room(room_id)
 
-    side_label = "Chap" if screen_num == 1 else "O'ng"
+    side_labels = {1: "Chap", 2: "O'ng", 3: "Markaziy / Qo'shimcha", 4: "Katta Zal Displeyi"}
+    side_label = side_labels.get(screen_num, f"{screen_num}-Monitor")
     screen_title = f"{screen_num}-Smart Monitor ({side_label})"
     return templates.TemplateResponse(
         request=request,

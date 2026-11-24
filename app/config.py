@@ -46,12 +46,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = BASE_DIR / "app"
 UPLOADS_DIR = BASE_DIR / "uploads"
 CACHE_DIR = BASE_DIR / "cache"
+DATA_DIR = BASE_DIR / "data"
 STATIC_DIR = APP_DIR / "static"
 TEMPLATES_DIR = APP_DIR / "templates"
 
 # Ensure runtime directories exist
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "css").mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "js").mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "assets").mkdir(parents=True, exist_ok=True)
@@ -86,6 +88,7 @@ DEFAULT_ROOMS = [
 # Supported media extensions
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif"}
 PRESENTATION_EXTENSIONS = {".pptx", ".ppt"}
+DOCUMENT_EXTENSIONS = {".docx", ".doc"}
 PDF_EXTENSIONS = {".pdf"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".ogg", ".mov"}
 

@@ -238,6 +238,66 @@ def process_pptx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
     return build_fallback_pptx_slides(temp_pptx, filename, room_id, file_hash)
 
 
+def process_docx_file(file_bytes: bytes, filename: str, room_id: str) -> List[SlideItem]:
+    """
+    Converts Word documents (.docx, .doc) into Vector PDF via LibreOffice (or Word COM on Windows),
+    then renders each page into an Ultra-HD WebP slide card.
+    """
+    file_hash = get_file_hash(file_bytes)
+    _, room_cache = ensure_room_dirs(room_id)
+    doc_cache_dir = room_cache / f"doc_{file_hash}"
+    doc_cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    ext = Path(filename).suffix.lower() or ".docx"
+    temp_doc = doc_cache_dir / f"document{ext}"
+    temp_doc.write_bytes(file_bytes)
+    pdf_converted = doc_cache_dir / "document.pdf"
+
+    # 1. Primary: LibreOffice headless (Works on Linux, Docker, Windows)
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        try:
+            import subprocess
+            subprocess.run([
+                soffice, "--headless", "--convert-to", "pdf",
+                str(temp_doc), "--outdir", str(doc_cache_dir)
+            ], check=True, timeout=40)
+        except Exception as e:
+            print(f"[MediaProcessor] LibreOffice Word conversion error: {e}")
+
+    # 2. Secondary: Windows Word COM (if on Windows)
+    if not pdf_converted.exists() and HAS_WIN32COM:
+        word_app = None
+        doc = None
+        try:
+            pythoncom.CoInitialize()
+            word_app = win32com.client.Dispatch("Word.Application")
+            doc = word_app.Documents.Open(str(temp_doc.resolve()))
+            # 17 = wdFormatPDF
+            doc.SaveAs(str(pdf_converted.resolve()), 17)
+        except Exception as e:
+            print(f"[MediaProcessor] Word COM PDF export failed: {e}")
+        finally:
+            if doc:
+                try: doc.Close()
+                except Exception: pass
+            if word_app:
+                try: word_app.Quit()
+                except Exception: pass
+            try: pythoncom.CoUninitialize()
+            except Exception: pass
+
+    # 3. If PDF was generated, render with Ultra-HD pypdfium2 / PyMuPDF
+    if pdf_converted.exists() and pdf_converted.stat().st_size > 0:
+        slides = process_pdf_file(pdf_converted.read_bytes(), filename, room_id)
+        for s in slides:
+            s.slide_type = "word_doc"
+            s.title = f"{Path(filename).stem} (Hujjat {s.index + 1}-bet)"
+        return slides
+
+    raise RuntimeError("Word hujjatini PDF formatiga o'tkazish imkoni bo'lmadi. Serverda LibreOffice kerak.")
+
+
 def build_fallback_pptx_slides(pptx_path: Path, filename: str, room_id: str, file_hash: str) -> List[SlideItem]:
     prs = Presentation(str(pptx_path))
     slides = []
@@ -299,158 +359,268 @@ def render_clean_presentation_card(output_path: Path, title: str, lines: List[st
 
 def get_default_starter_slides(room_id: str, room_name: str) -> List[SlideItem]:
     """
-    Renders the exact TatU Parallel Dasturlash presentation shown in the user's reference images!
+    Renders an inspiring, futuristic, modern education presentation
+    that engages students with creative visuals, tech themes, and interactive tips.
     """
     _, room_cache = ensure_room_dirs(room_id)
     starter_dir = room_cache / "starter_deck"
     starter_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Slide 1 (Exact from reference image #1 and #2 - Cover Title with grid icon):
+    # Slide 1: Welcome & Innovation
     slide1_path = starter_dir / "slide_1.webp"
-    render_tatu_slide(
+    render_creative_smart_slide(
         output_path=slide1_path,
-        univ_header="Muhammad al-Xorazmiy nomidagi Toshkent axborot texnologiyalari universiteti",
-        course_tag="«Parallel dasturlash» fani  •  7-ma'ruza",
-        main_title="Parallel dasturlar unumdorligini baholash",
-        body_subtitle="Amdal va Gustafson qonunlari • tezlashish • samaradorlik • masshtablanuvchanlik • profiling",
+        badge_tag="⚡ DDDS SMART AUDITORIYA",
+        badge_color=(14, 165, 233),
+        main_title="Simsiz Interaktiv Dars Platformasi",
+        subtitle="Kelajak Ta'lim Texnologiyasi Bugun Amalda",
+        bullet_points=[
+            "Ultra-HD Slaydlar va Jonli 60 FPS Efir (WebRTC)",
+            "Smartfon Pulti orqali Masofadan Boshqaruv va Lazer",
+            "Ko'p Monitorli Sinxronizatsiya va Sensor Bloklash",
+            "Interaktiv Oq Doska va Raqamli Qalam bilan Tahlil"
+        ],
         slide_num=1,
         total_slides=4,
-        footer_info="Kompyuter Injiringi • 60610300 • Toshkent - 2026",
-        show_cover_diagram=True
+        quote="«Auditoriyangizni zamonaviy innovatsion markazga aylantiring»"
     )
 
-    # 2. Slide 2 (Clean Amdahl's law - NO grid boxes):
+    # Slide 2: Digital Era & AI
     slide2_path = starter_dir / "slide_2.webp"
-    render_tatu_slide(
+    render_creative_smart_slide(
         output_path=slide2_path,
-        univ_header="Muhammad al-Xorazmiy nomidagi Toshkent axborot texnologiyalari universiteti",
-        course_tag="«Parallel dasturlash» fani  •  7-ma'ruza",
-        main_title="Amdal Qonuni (Amdahl's Law)",
-        body_subtitle="S(p) = 1 / ( (1 - f) + f / p )\n\nf — dasturning paralellashtiriladigan qismi ulushi (0 ≤ f ≤ 1)\np — tizimdagi protsessor yadrolari soni\nS(p) — nazariy maksimal tezlashish ko'rsatkichi",
+        badge_tag="🚀 RAQAMLI KELAJAK & SUN'IY INTELLEKT",
+        badge_color=(168, 85, 247),
+        main_title="Sun'iy Intellekt va Yangi Imkoniyatlar",
+        subtitle="Raqamli Dunyoda Muvaffaqiyat Asoslari",
+        bullet_points=[
+            "Generativ modellar va zamonaviy algoritmlar rivoji",
+            "Bulutli platformalar va real vaqtli kommunikatsiyalar",
+            "Katta ma'lumotlar tahlili va yuqori unumdor tizimlar",
+            "Nazariy bilimlarni amaliy loyihalarga aylantirish san'ati"
+        ],
         slide_num=2,
         total_slides=4,
-        footer_info="Kompyuter Injiringi • 60610300 • Toshkent - 2026",
-        show_cover_diagram=False
+        quote="«Kelajak kasblari bugungi darslarda boshlanadi»"
     )
 
-    # 3. Slide 3 (Clean Gustafson's law - NO grid boxes):
+    # Slide 3: Interactive Learning
     slide3_path = starter_dir / "slide_3.webp"
-    render_tatu_slide(
+    render_creative_smart_slide(
         output_path=slide3_path,
-        univ_header="Muhammad al-Xorazmiy nomidagi Toshkent axborot texnologiyalari universiteti",
-        course_tag="«Parallel dasturlash» fani  •  7-ma'ruza",
-        main_title="Gustafson-Barsis Qonuni (Masshtablanuvchanlik)",
-        body_subtitle="S(p) = p - α · (p - 1)\n\nα — dasturning ketma-ket (serial) qismi nisbati\nMasshtablangan tezlashish (Scaled Speedup)\nHisoblash hajmi protsessorlar soniga mutanosib oshganda",
+        badge_tag="🎯 INTERAKTIV MULOQOT",
+        badge_color=(16, 185, 129),
+        main_title="Qiziqarli Munozara va Jonli Tahlil",
+        subtitle="Har bir talaba faol qatnashadigan muhit",
+        bullet_points=[
+            "Monitorda real vaqt rejimida chizish va izohlash",
+            "Kichik shriftli formula va jadvallarni yaqinlashtirish (Zoom)",
+            "Noutbukdagi videolarni ovozi bilan birga to'g'ridan-to'g'ri ko'rsatish",
+            "Savol-javoblar va jamoaviy yechimlar tahlili"
+        ],
         slide_num=3,
         total_slides=4,
-        footer_info="Kompyuter Injiringi • 60610300 • Toshkent - 2026",
-        show_cover_diagram=False
+        quote="«Eng yaxshi dars — o'quvchi o'zini qatnashchi his qilgan darsdir»"
     )
 
-    # 4. Slide 4 (Clean Profiling slide - NO grid boxes):
+    # Slide 4: Motivation & Excellence
     slide4_path = starter_dir / "slide_4.webp"
-    render_tatu_slide(
+    render_creative_smart_slide(
         output_path=slide4_path,
-        univ_header="Muhammad al-Xorazmiy nomidagi Toshkent axborot texnologiyalari universiteti",
-        course_tag="«Parallel dasturlash» fani  •  7-ma'ruza",
-        main_title="Parallel Dasturlarni Profiling Qilish",
-        body_subtitle="Vaqt sarfi tahlili: Hisoblash vaqti vs Kommunikatsiya vaqti\n\n• Amaliy profiling vositalari: Intel VTune, gprof, Valgrind\n• Kommunikatsiya kechikishlari: MPI Barrier va Point-to-Point\n• Kesh xatolari (Cache Misses) va xotira o'tkazuvchanligi",
+        badge_tag="💡 ILM VA RIVOJLANISH",
+        badge_color=(245, 158, 11),
+        main_title="O'rganishdan To'xtamang!",
+        subtitle="Doimiy Harakat — Katta Zafarlar Kaliti",
+        bullet_points=[
+            "Katta orzular qiling va ularga qadam-baqadam erishing",
+            "Xatolardan o'rganish — eng tez rivojlanish usulidir",
+            "Jamoada ishlash va yangi g'oyalarni qo'rqmasdan sinash",
+            "Bugungi intilish va mehnat ertangi yutuqlaringiz poydevoridir"
+        ],
         slide_num=4,
         total_slides=4,
-        footer_info="Kompyuter Injiringi • 60610300 • Toshkent - 2026",
-        show_cover_diagram=False
+        quote="«O'rganishdan to'xtagan odam — kelajakdan ortda qoladi»"
     )
 
-    slides = [
+    return [
         SlideItem(
-            id="tatu_p1",
+            id="ddds_s1",
             index=0,
-            title="7-maruza_Parallel_dasturlar_unumdorligini_baholash",
+            title="1. Simsiz Interaktiv Dars Platformasi",
             image_url=f"/cache/{room_id}/starter_deck/slide_1.webp",
-            speaker_notes="Kirish: Ushbu ma'ruzada parallel hisoblash tizimlarining asosiy qonunlari — Amdal va Gustafson qonunlarini o'rganamiz.",
+            speaker_notes="Kirish: DDDS Smart Platformasiga xush kelibsiz! Bugungi darsimiz zamonaviy interaktiv texnologiyalar bilan o'tadi.",
             slide_type="pptx_card"
         ),
         SlideItem(
-            id="tatu_p2",
+            id="ddds_s2",
             index=1,
-            title="Amdal Qonuni (Amdahl's Law)",
+            title="2. Sun'iy Intellekt va Yangi Imkoniyatlar",
             image_url=f"/cache/{room_id}/starter_deck/slide_2.webp",
-            speaker_notes="Amdal qonuni: Agar dasturning ketma-ket qismi 10% bo'lsa, hatto cheksiz yadrolar berilganda ham maksimal tezlashish 10 barobardan oshmaydi.",
+            speaker_notes="2-Mavzu: Zamonaviy dunyoda AI va raqamli texnologiyalarning amaliy qo'llanilishi haqida fikr almashamiz.",
             slide_type="pptx_card"
         ),
         SlideItem(
-            id="tatu_p3",
+            id="ddds_s3",
             index=2,
-            title="Gustafson-Barsis Qonuni",
+            title="3. Qiziqarli Munozara va Jonli Tahlil",
             image_url=f"/cache/{room_id}/starter_deck/slide_3.webp",
-            speaker_notes="Gustafson qonuni: Amaliyotda protsessorlar soni oshganda, yechilayotgan masalaning hajmi ham kengaytiriladi.",
+            speaker_notes="3-Qism: Ekranda chizish va Zoom imkoniyati bilan formulalarni birgalikda tahlil qilamiz.",
             slide_type="pptx_card"
         ),
         SlideItem(
-            id="tatu_p4",
+            id="ddds_s4",
             index=3,
-            title="Parallel Dasturlarni Profiling Qilish",
+            title="4. O'rganishdan To'xtamang!",
             image_url=f"/cache/{room_id}/starter_deck/slide_4.webp",
-            speaker_notes="Xulosa: Profiling vositalari (gprof, VTune, Valgrind) orqali kesh xatolari va kechikishlar aniqlanadi.",
+            speaker_notes="Xulosa: Har doim o'rganishda davom eting! Savollaringiz bo'lsa marhamat.",
             slide_type="pptx_card"
         )
     ]
-    return slides
 
 
-def render_tatu_slide(output_path: Path, univ_header: str, course_tag: str, 
-                      main_title: str, body_subtitle: str, slide_num: int, 
-                      total_slides: int, footer_info: str, show_cover_diagram: bool = False):
-    """Generates the exact dark blue university slide visual from the user's reference images."""
+def get_whiteboard_permanent_slides(room_id: str) -> List[SlideItem]:
+    """
+    Generates 3 pristine whiteboard canvases (Clean White, Math Dot-Grid, Dark Academic)
+    that stay permanently in the room portfolio for free drawing and formulas.
+    """
+    _, room_cache = ensure_room_dirs(room_id)
+    wb_dir = room_cache / "whiteboard_deck"
+    wb_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Toza Oq Doska
+    p1 = wb_dir / "board_1.webp"
+    if not p1.exists():
+        render_whiteboard_canvas(p1, bg_color=(255, 255, 255), is_grid=False, title="TOZA OQ DOSKA")
+
+    # 2. Katakli Matematik Doska (Grid)
+    p2 = wb_dir / "board_2.webp"
+    if not p2.exists():
+        render_whiteboard_canvas(p2, bg_color=(252, 253, 255), is_grid=True, title="KATAKLI DOSKA (GRID)")
+
+    # 3. Qora Akademik Doska
+    p3 = wb_dir / "board_3.webp"
+    if not p3.exists():
+        render_whiteboard_canvas(p3, bg_color=(15, 23, 42), is_grid=False, title="QORA AKADEMIK DOSKA", is_dark=True)
+
+    return [
+        SlideItem(
+            id="wb_p1",
+            index=0,
+            title="📋 1. Toza Oq Doska",
+            image_url=f"/cache/{room_id}/whiteboard_deck/board_1.webp",
+            speaker_notes="Toza oq doska: qalam yoki marker orqali formulalar va erkin chizish uchun.",
+            slide_type="whiteboard_page"
+        ),
+        SlideItem(
+            id="wb_p2",
+            index=1,
+            title="📐 2. Katakli Doska (Matematika & Grafik)",
+            image_url=f"/cache/{room_id}/whiteboard_deck/board_2.webp",
+            speaker_notes="Katakli doska: grafiklar, jadvallar va geometrik chizmalar uchun qulay.",
+            slide_type="whiteboard_page"
+        ),
+        SlideItem(
+            id="wb_p3",
+            index=2,
+            title="🎓 3. Qora Akademik Doska",
+            image_url=f"/cache/{room_id}/whiteboard_deck/board_3.webp",
+            speaker_notes="Qora fonli akademik doska: kontrastli ranglarda chizish uchun.",
+            slide_type="whiteboard_page"
+        )
+    ]
+
+
+def render_creative_smart_slide(output_path: Path, badge_tag: str, badge_color: tuple,
+                                main_title: str, subtitle: str, bullet_points: list,
+                                slide_num: int, total_slides: int, quote: str):
+    """
+    Renders an Ultra-HD (1920x1080) modern educational presentation slide
+    with rich futuristic cyber-indigo styling, glowing pill tags, and sleek cards.
+    """
     width, height = 1920, 1080
-    # Exact Dark Blue classroom background from reference image #2: rgb(18, 28, 48)
-    img = Image.new("RGB", (width, height), color=(18, 30, 52))
+    # Futuristic deep cyber-indigo canvas
+    img = Image.new("RGB", (width, height), color=(10, 15, 29))
     draw = ImageDraw.Draw(img)
 
     try:
-        font_univ = ImageFont.truetype("arial.ttf", 26)
-        font_tag = ImageFont.truetype("arial.ttf", 32)
-        font_title = ImageFont.truetype("arial.ttf", 64)
-        font_body = ImageFont.truetype("arial.ttf", 34)
+        font_badge = ImageFont.truetype("arial.ttf", 26)
+        font_title = ImageFont.truetype("arial.ttf", 62)
+        font_sub = ImageFont.truetype("arial.ttf", 34)
+        font_bullet = ImageFont.truetype("arial.ttf", 32)
+        font_quote = ImageFont.truetype("arial.ttf", 28)
         font_footer = ImageFont.truetype("arial.ttf", 22)
     except Exception:
-        font_univ = ImageFont.load_default()
-        font_tag = ImageFont.load_default()
+        font_badge = ImageFont.load_default()
         font_title = ImageFont.load_default()
-        font_body = ImageFont.load_default()
+        font_sub = ImageFont.load_default()
+        font_bullet = ImageFont.load_default()
+        font_quote = ImageFont.load_default()
         font_footer = ImageFont.load_default()
 
-    # 1. University header
-    draw.text((140, 140), univ_header, fill=(203, 213, 225), font=font_univ)
+    # Subtle background accent card
+    draw.rounded_rectangle([80, 60, width - 80, height - 60], radius=28, fill=(16, 24, 46), outline=(30, 45, 80), width=2)
 
-    # 2. Course tag
-    draw.text((140, 240), course_tag, fill=(245, 158, 11), font=font_tag)
+    # Top Glowing Pill Tag
+    tag_w = len(badge_tag) * 16 + 40
+    draw.rounded_rectangle([130, 110, 130 + tag_w, 160], radius=25, fill=(badge_color[0]//4, badge_color[1]//4, badge_color[2]//4), outline=badge_color, width=2)
+    draw.text((150, 122), badge_tag, fill=badge_color, font=font_badge)
 
-    # 3. Main Title
-    draw.text((140, 310), main_title, fill=(255, 255, 255), font=font_title)
+    # Main Title & Subtitle
+    draw.text((130, 190), main_title, fill=(255, 255, 255), font=font_title)
+    draw.text((130, 275), subtitle, fill=(148, 163, 184), font=font_sub)
 
-    # 4. Body subtitle lines
-    curr_y = 440
-    for line in body_subtitle.split("\n"):
-        draw.text((140, curr_y), line, fill=(203, 213, 225), font=font_body)
-        curr_y += 55
+    # Horizontal glowing separator
+    draw.line([(130, 335), (width - 130, 335)], fill=(30, 50, 90), width=2)
 
-    # 5. Diagram Icon representation: ONLY ON TITLE / COVER SLIDE (slide 1)
-    if show_cover_diagram:
-        grid_x = 960
-        grid_y = 540
-        box_w = 60
-        box_h = 36
-        gap = 14
-        for r in range(2):
-            for c in range(5):
-                bx = grid_x + c * (box_w + gap)
-                by = grid_y + r * (box_h + gap)
-                fill_col = (234, 88, 12) if (r == 0 and c < 3) or (r == 1 and c > 2) else (14, 116, 144)
-                draw.rectangle([bx, by, bx + box_w, by + box_h], fill=fill_col, outline=(51, 65, 85), width=2)
+    # Bullet Points (with glowing indicators)
+    curr_y = 380
+    for idx, pt in enumerate(bullet_points):
+        # Card background for bullet
+        draw.rounded_rectangle([130, curr_y, width - 130, curr_y + 70], radius=14, fill=(22, 32, 60), outline=(38, 54, 98), width=1)
+        # Bullet badge
+        draw.rounded_rectangle([150, curr_y + 16, 188, curr_y + 54], radius=10, fill=badge_color)
+        draw.text((163, curr_y + 20), str(idx + 1), fill=(255, 255, 255), font=font_badge)
+        # Bullet text
+        draw.text((210, curr_y + 18), pt, fill=(241, 245, 249), font=font_bullet)
+        curr_y += 92
 
-    # 6. Footer
-    draw.text((140, height - 120), footer_info, fill=(148, 163, 184), font=font_footer)
+    # Bottom Quote Box
+    draw.rounded_rectangle([130, height - 190, width - 130, height - 120], radius=14, fill=(15, 23, 42), outline=(40, 60, 100), width=1)
+    draw.text((160, height - 165), quote, fill=(203, 213, 225), font=font_quote)
+
+    # Footer
+    draw.text((130, height - 95), "DDDS Cloud • Smart Classroom Platform", fill=(100, 116, 139), font=font_footer)
+    draw.text((width - 240, height - 95), f"Slayd {slide_num} / {total_slides}", fill=(148, 163, 184), font=font_footer)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(output_path, "WEBP", quality=98, method=6)
+
+
+def render_whiteboard_canvas(output_path: Path, bg_color: tuple, is_grid: bool = False,
+                            title: str = "OQ DOSKA", is_dark: bool = False):
+    """Generates an Ultra-HD 1920x1080 whiteboard slide canvas with optional math grid dots."""
+    width, height = 1920, 1080
+    img = Image.new("RGB", (width, height), color=bg_color)
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_header = ImageFont.truetype("arial.ttf", 22)
+    except Exception:
+        font_header = ImageFont.load_default()
+
+    # Optional Math / Coordinate Grid
+    if is_grid:
+        grid_step = 60
+        dot_color = (210, 220, 235) if not is_dark else (40, 55, 85)
+        for x in range(60, width - 60, grid_step):
+            for y in range(60, height - 60, grid_step):
+                draw.rectangle([x - 1, y - 1, x + 1, y + 1], fill=dot_color)
+
+    # Subtle discrete header badge at top right
+    badge_bg = (235, 240, 250) if not is_dark else (25, 35, 60)
+    badge_fg = (100, 116, 139) if not is_dark else (148, 163, 184)
+    draw.rounded_rectangle([width - 320, 24, width - 40, 64], radius=12, fill=badge_bg)
+    draw.text((width - 300, 34), f"DDDS • {title}", fill=badge_fg, font=font_header)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(output_path, "WEBP", quality=95, method=6)

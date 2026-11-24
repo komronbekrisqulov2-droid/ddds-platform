@@ -20,6 +20,8 @@ class MediaType(str, Enum):
 class ClientRole(str, Enum):
     SCREEN_1 = "screen_1"
     SCREEN_2 = "screen_2"
+    SCREEN_3 = "screen_3"
+    SCREEN_4 = "screen_4"
     ADMIN = "admin"
     REMOTE = "remote"
     VIEWER = "viewer"
@@ -89,10 +91,11 @@ class ConnectedClient(BaseModel):
 class PresentationDeck(BaseModel):
     id: str
     name: str
-    format: str = "pptx"  # "pptx", "pdf", "image"
+    format: str = "pptx"  # "pptx", "pdf", "image", "docx", "whiteboard"
     slide_count: int = 0
     slides: List[SlideItem] = Field(default_factory=list)
     is_active: bool = False
+    is_permanent: bool = False
     created_at: float = Field(default_factory=time.time)
 
 
@@ -109,16 +112,24 @@ class RoomState(BaseModel):
     locked: bool = False
     touch_locked: bool = False
     whiteboard_bg: str = "grid"  # "dark", "white", "grid"
+
+    # Zoom & Pan State (Magnification for Word & Details)
+    zoom_level: float = 1.0  # 0.5 to 3.5
+    pan_x: float = 0.0
+    pan_y: float = 0.0
+    display_count: int = 2   # 1 to 4 displays
     
     # Active presentation decks / items
     slides: List[SlideItem] = Field(default_factory=list)
-    active_deck_name: str = "7-maruza_Parallel_dasturlar_unumdorligini_baholash"
+    active_deck_name: str = "DDDS_Smart_Taqdimot"
     active_deck_id: Optional[str] = "starter_deck"
     saved_decks: List[PresentationDeck] = Field(default_factory=list)
     
     # Independent or synchronized screen status
     screen1: ScreenState = Field(default_factory=lambda: ScreenState(label="1-Smart Monitor (Chap)"))
     screen2: ScreenState = Field(default_factory=lambda: ScreenState(label="2-Smart Monitor (O'ng)"))
+    screen3: ScreenState = Field(default_factory=lambda: ScreenState(label="3-Smart Monitor"))
+    screen4: ScreenState = Field(default_factory=lambda: ScreenState(label="4-Smart Monitor"))
     
     # Live laser & drawing overlays
     laser: LaserState = Field(default_factory=LaserState)

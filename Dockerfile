@@ -7,10 +7,18 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies (build-essential, libgl for Pillow/PDF if needed)
+# Install system dependencies:
+# - build-essential, curl
+# - libreoffice-writer, libreoffice-impress (headless docx & pptx conversion)
+# - fonts-liberation, fonts-dejavu-core, fonts-noto-core (flawless Cyrillic/Latin typography)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    libreoffice-writer \
+    libreoffice-impress \
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python packages
@@ -21,9 +29,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create runtime directories
-RUN mkdir -p uploads cache
+RUN mkdir -p uploads cache data
 
 EXPOSE 8000
 
 CMD ["python", "run.py", "--host", "0.0.0.0", "--port", "8000"]
-

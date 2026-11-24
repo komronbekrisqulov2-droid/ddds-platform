@@ -97,7 +97,8 @@ async def room_websocket_endpoint(websocket: WebSocket, room_id: str, client_rol
             # Command protection: require authentication for mutative actions
             COMMAND_ACTIONS = {
                 "CHANGE_SLIDE", "NEXT_SLIDE", "PREV_SLIDE", "SET_DISPLAY_MODE",
-                "SET_MEDIA_TYPE", "TOGGLE_BLACKOUT", "TOGGLE_LOCK", "TOGGLE_TOUCH_LOCK", "RELOAD_SCREENS"
+                "SET_MEDIA_TYPE", "TOGGLE_BLACKOUT", "TOGGLE_LOCK", "TOGGLE_TOUCH_LOCK", 
+                "RELOAD_SCREENS", "SET_ZOOM"
             }
             if msg_type in COMMAND_ACTIONS and not is_authenticated:
                 await websocket.send_json({
@@ -161,6 +162,15 @@ async def room_websocket_endpoint(websocket: WebSocket, room_id: str, client_rol
             elif msg_type == "TOGGLE_TOUCH_LOCK":
                 target_state = payload.get("touch_locked", None)
                 await state_manager.set_touch_lock(room_id, target_state)
+
+            elif msg_type == "SET_ZOOM":
+                zoom = safe_float(payload.get("zoom"), 1.0)
+                pan_x = safe_float(payload.get("pan_x"), 0.0)
+                pan_y = safe_float(payload.get("pan_y"), 0.0)
+                room.zoom_level = max(0.5, min(4.0, zoom))
+                room.pan_x = pan_x
+                room.pan_y = pan_y
+                await state_manager.broadcast_state(room_id, reason="ZOOM_CHANGED")
 
             elif msg_type == "RESYNC":
                 await state_manager.broadcast_state(room_id, reason="MANUAL_RESYNC")

@@ -323,6 +323,13 @@ class DDDSClient {
         });
     }
 
+    setZoom(zoom, panX = 0, panY = 0) {
+        this.sendRaw({
+            type: 'SET_ZOOM',
+            payload: { zoom, pan_x: panX, pan_y: panY }
+        });
+    }
+
     resync() {
         this.sendRaw({ type: 'RESYNC' });
     }

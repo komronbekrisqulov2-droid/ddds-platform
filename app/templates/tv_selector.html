@@ -50,8 +50,8 @@
 
 .tv-buttons-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
     margin-bottom: 30px;
 }
 @media (max-width: 680px) {
@@ -71,8 +71,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    padding: 36px 20px;
+    gap: 14px;
+    padding: 28px 20px;
     border-radius: 20px;
     text-decoration: none;
     transition: all 0.25s ease;
@@ -98,15 +98,31 @@
 .btn-screen-2:hover {
     background: linear-gradient(135deg, #8b5cf6, #6366f1);
 }
+.btn-screen-3 {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(5, 150, 105, 0.25));
+    border-color: #10b981;
+    color: white;
+}
+.btn-screen-3:hover {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+.btn-screen-4 {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.25));
+    border-color: #f59e0b;
+    color: white;
+}
+.btn-screen-4:hover {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+}
 .tv-btn-icon {
-    font-size: 3.5rem;
+    font-size: 3rem;
 }
 .tv-btn-label {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 800;
 }
 .tv-btn-sub {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     opacity: 0.85;
 }
 
@@ -131,13 +147,25 @@
             <a href="/screen/{{ room.room_id }}/1" class="tv-screen-btn btn-screen-1">
                 <div class="tv-btn-icon">🖥</div>
                 <div class="tv-btn-label">1-Smart Monitor</div>
-                <div class="tv-btn-sub">Chap Displey (Asosiy Slayd / Masala)</div>
+                <div class="tv-btn-sub">Chap Displey (Asosiy Slayd / Taqdimot)</div>
             </a>
 
             <a href="/screen/{{ room.room_id }}/2" class="tv-screen-btn btn-screen-2">
                 <div class="tv-btn-icon">🖥</div>
                 <div class="tv-btn-label">2-Smart Monitor</div>
-                <div class="tv-btn-sub">O'ng Displey (Mirror yoki Split Yechim)</div>
+                <div class="tv-btn-sub">O'ng Displey (Mirror yoki Split Rejim)</div>
+            </a>
+
+            <a href="/screen/{{ room.room_id }}/3" class="tv-screen-btn btn-screen-3">
+                <div class="tv-btn-icon">🖥</div>
+                <div class="tv-btn-label">3-Smart Monitor</div>
+                <div class="tv-btn-sub">Markaziy / Qo'shimcha Katta Ekran</div>
+            </a>
+
+            <a href="/screen/{{ room.room_id }}/4" class="tv-screen-btn btn-screen-4">
+                <div class="tv-btn-icon">🖥</div>
+                <div class="tv-btn-label">4-Smart Monitor</div>
+                <div class="tv-btn-sub">Katta Zal / Auditoriya Orqa Displeyi</div>
             </a>
         </div>
 

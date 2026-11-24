@@ -7,6 +7,22 @@
 {% endblock %}
 
 {% block content %}
+<!-- Admin PIN Security Modal -->
+<div id="admin-pin-modal" style="display: none; position: fixed; inset: 0; background: rgba(5,9,18,0.85); backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center;">
+    <div style="background: #0f172a; border: 2px solid #38bdf8; border-radius: 24px; width: 100%; max-width: 440px; padding: 36px 30px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.9);">
+        <div style="font-size: 3rem; margin-bottom: 10px;">🔐</div>
+        <h2 style="font-size: 1.5rem; font-weight: 800; color: #38bdf8; margin-bottom: 6px;">O'qituvchi Boshqaruv PIN-Kodi</h2>
+        <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 22px;">
+            Auditoriya boshqaruviga kirish uchun 4 xonali PIN-kodni kiriting:
+        </p>
+        <input type="password" id="admin-pin-input" style="width: 100%; background: #1e293b; border: 2px solid #334155; border-radius: 14px; color: white; font-size: 1.8rem; text-align: center; letter-spacing: 12px; padding: 14px; margin-bottom: 12px; outline: none; box-sizing: border-box;" maxlength="6" inputmode="numeric" placeholder="••••">
+        <div id="admin-pin-err" style="color: #f43f5e; font-size: 0.88rem; font-weight: 600; margin-bottom: 16px; display: none;">
+            PIN-kod noto'g'ri! Qayta urinib ko'ring.
+        </div>
+        <button class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 1.05rem; font-weight: 800; border-radius: 12px;" onclick="verifyAdminPin()">Tasdiqlash & Kirish</button>
+    </div>
+</div>
+
 <!-- Master Top Header -->
 <header class="master-header">
     <div class="brand-section">
@@ -172,6 +188,9 @@
                     <button class="ppt-btn ppt-btn-blackout" id="btn-ctrl-blackout" onclick="toggleBlackout()">🟠 Qoraytirish (B)</button>
                     <button class="ppt-btn ppt-btn-lock" id="btn-ctrl-lock" onclick="toggleLockDisplays()">🔒 Bloklash</button>
                     <button class="ppt-btn ppt-btn-touch-lock" id="btn-ctrl-touch-lock" onclick="toggleTouchLock()" title="Monitor sensorini bloklash (behosdan tegib ketishdan himoya)">✋ Sensorni Bloklash</button>
+                    <button class="ppt-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; font-weight: 700;" onclick="handleAdminZoom(-0.25)" title="Kichiklashtirish">🔍-</button>
+                    <button class="ppt-btn" style="background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; font-weight: 700;" onclick="handleAdminZoom(0, true)" title="Asl o'lcham (100%)">100%</button>
+                    <button class="ppt-btn" style="background: rgba(56, 189, 248, 0.25); border: 1px solid #38bdf8; color: #38bdf8; font-weight: 700;" onclick="handleAdminZoom(0.25)" title="Kattalashtirish (Zoom)">🔍+</button>
                 </div>
             </div>
         </div>
@@ -539,8 +558,75 @@
 {% block extra_js %}
 <script>
 const ROOM_ID = "{{ room.room_id }}";
-const client = new DDDSClient(ROOM_ID, 'admin', '{{ admin_token }}');
+let savedAdminToken = sessionStorage.getItem(`ddds_admin_auth_${ROOM_ID}`) || '{{ admin_token }}';
+const client = new DDDSClient(ROOM_ID, 'admin', savedAdminToken);
 const broadcaster = new WebRTCBroadcaster(client);
+
+// PIN Auth Check for Admin
+function checkAdminAuth() {
+    const isAuthed = sessionStorage.getItem(`ddds_admin_authed_${ROOM_ID}`) === 'true';
+    const modal = document.getElementById('admin-pin-modal');
+    if (!isAuthed && modal) {
+        modal.style.display = 'flex';
+        const input = document.getElementById('admin-pin-input');
+        if (input) input.focus();
+    }
+}
+
+async function verifyAdminPin() {
+    const input = document.getElementById('admin-pin-input');
+    const err = document.getElementById('admin-pin-err');
+    const pin = input ? input.value.trim() : '';
+    if (!pin) return;
+
+    try {
+        const res = await fetch(`/api/room/${encodeURIComponent(ROOM_ID)}/verify_pin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin: pin })
+        });
+        const data = await res.json();
+        if (data.valid && data.token) {
+            sessionStorage.setItem(`ddds_admin_authed_${ROOM_ID}`, 'true');
+            sessionStorage.setItem(`ddds_admin_auth_${ROOM_ID}`, data.token);
+            client.authToken = data.token;
+            client.sendAuth(data.token);
+            document.getElementById('admin-pin-modal').style.display = 'none';
+            if (err) err.style.display = 'none';
+        } else {
+            if (err) {
+                err.innerText = data.detail || "PIN-kod noto'g'ri!";
+                err.style.display = 'block';
+            }
+            if (input) { input.value = ''; input.focus(); }
+        }
+    } catch (e) {
+        if (err) {
+            err.innerText = "Ulanish xatosi: " + e.message;
+            err.style.display = 'block';
+        }
+    }
+}
+
+const adminPinInput = document.getElementById('admin-pin-input');
+if (adminPinInput) {
+    adminPinInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') verifyAdminPin();
+    });
+}
+checkAdminAuth();
+
+// Admin Zoom Handler
+let currentAdminZoom = 1.0;
+function handleAdminZoom(delta, reset = false) {
+    if (reset) {
+        currentAdminZoom = 1.0;
+    } else {
+        currentAdminZoom = Math.max(0.75, Math.min(3.5, currentAdminZoom + delta));
+    }
+    client.setZoom(currentAdminZoom, 0, 0);
+    logEvent(`🔍 Ekran masshtabi o'zgartirildi: ${Math.round(currentAdminZoom * 100)}%`);
+}
 
 function resetAdminShareUI() {
     const btn = document.getElementById('btn-master-share');

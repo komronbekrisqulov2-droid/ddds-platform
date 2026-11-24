@@ -229,6 +229,80 @@
         </div>
         {% endfor %}
     </div>
+
+    <!-- Developer Info, Technical Support & Feedback Section -->
+    <div style="margin-top: 48px; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border: 1.5px solid #334155; border-radius: 20px; padding: 32px 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px; align-items: start;">
+            <!-- Left: Support & Developer Info -->
+            <div>
+                <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid #38bdf8; color: #38bdf8; padding: 4px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 12px;">
+                    👨‍💻 LOYIHA MUALLIFI & TEXNIK KO'MAK
+                </div>
+                <h3 style="font-size: 1.5rem; font-weight: 800; color: white; margin-bottom: 8px;">Komronbek Risqulov</h3>
+                <p style="color: #94a3b8; font-size: 0.92rem; line-height: 1.5; margin-bottom: 20px;">
+                    DDDS Cloud — Oliy ta'lim muassasalari va maktablar uchun simsiz, barqaror va interaktiv smart auditoriya boshqaruv platformasi. Savollar, texnik yordam yoki yangi g'oyalar bo'yicha bevosita bog'lanishingiz mumkin.
+                </p>
+
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <a href="https://t.me/komronbek_risqulov" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(14, 165, 233, 0.15); border: 1px solid #0ea5e9; border-radius: 12px; color: white; text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: all 0.2s;">
+                        <span style="font-size: 1.3rem;">✈️</span>
+                        <div>
+                            <div>Telegram orqali bog'lanish</div>
+                            <div style="font-size: 0.78rem; color: #38bdf8;">@komronbek_risqulov</div>
+                        </div>
+                    </a>
+
+                    <a href="mailto:komronbekrisqulov2@gmail.com" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 12px; color: white; text-decoration: none; font-weight: 600; font-size: 0.92rem; transition: all 0.2s;">
+                        <span style="font-size: 1.3rem;">✉️</span>
+                        <div>
+                            <div>Elektron Pochta (Gmail)</div>
+                            <div style="font-size: 0.78rem; color: #f87171;">komronbekrisqulov2@gmail.com</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Right: Interactive Feedback Form -->
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 16px; padding: 24px;">
+                <h4 style="font-size: 1.15rem; font-weight: 700; color: white; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+                    <span>💡</span> <span>Taklif va Mulohazalar Bildirish</span>
+                </h4>
+                <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px;">
+                    Platformani yanada mukammallashtirish bo'yicha fikr yoki taklifingiz bormi? Yozib qoldiring!
+                </p>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="font-size: 0.8rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Ismingiz:</label>
+                        <input type="text" id="fb-name" placeholder="Masalan: Sardor" style="width: 100%; padding: 9px 12px; background: #0c1427; border: 1px solid #334155; border-radius: 8px; color: white; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.8rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Rolingiz / Vazifangiz:</label>
+                        <select id="fb-role" style="width: 100%; padding: 9px 12px; background: #0c1427; border: 1px solid #334155; border-radius: 8px; color: white; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+                            <option value="O'qituvchi">O'qituvchi / Domla</option>
+                            <option value="Talaba">Talaba</option>
+                            <option value="Laborant">Laborant / Xodim</option>
+                            <option value="Mehmon">Mehmon</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 10px;">
+                    <label style="font-size: 0.8rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Bog'lanish uchun (Telegram yoki Tel, ixtiyoriy):</label>
+                    <input type="text" id="fb-contact" placeholder="@username yoki telefon" style="width: 100%; padding: 9px 12px; background: #0c1427; border: 1px solid #334155; border-radius: 8px; color: white; font-size: 0.88rem; outline: none; box-sizing: border-box;">
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <label style="font-size: 0.8rem; color: #cbd5e1; display: block; margin-bottom: 4px;">Taklif yoki Xabaringiz:</label>
+                    <textarea id="fb-msg" rows="3" placeholder="Platformaga yana qanday qulaylik yoki funksiya qo'shishni istaysiz?..." style="width: 100%; padding: 10px 12px; background: #0c1427; border: 1px solid #334155; border-radius: 8px; color: white; font-size: 0.88rem; outline: none; resize: vertical; box-sizing: border-box;"></textarea>
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; padding: 11px; font-weight: 700; font-size: 0.92rem;" onclick="submitFeedbackForm()">
+                    Yuborish ✨
+                </button>
+            </div>
+        </div>
+    </div>
 </main>
 
 <!-- New Room Modal -->
@@ -419,6 +493,37 @@ async function executeDeleteRoom() {
         } else {
             const data = await resp.json();
             showToast(data.detail || "O'chirishda xatolik", "error");
+        }
+    } catch (e) {
+        showToast("Server xatosi: " + e.message, "error");
+    }
+}
+
+// Feedback Form Submission
+async function submitFeedbackForm() {
+    const name = document.getElementById('fb-name').value.trim();
+    const role = document.getElementById('fb-role').value;
+    const contact = document.getElementById('fb-contact').value.trim();
+    const message = document.getElementById('fb-msg').value.trim();
+
+    if (!message) {
+        showToast("Iltimos, taklif yoki xabar matnini kiriting!", "error");
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, role, contact, message })
+        });
+        const data = await resp.json();
+        if (resp.ok) {
+            showToast("Rahmat! Taklifingiz muallifga muvaffaqiyatli yetkazildi ✨", "success");
+            document.getElementById('fb-msg').value = '';
+            document.getElementById('fb-contact').value = '';
+        } else {
+            showToast(data.detail || "Xatolik yuz berdi", "error");
         }
     } catch (e) {
         showToast("Server xatosi: " + e.message, "error");
