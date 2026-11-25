@@ -11,19 +11,16 @@ WORKDIR /app
 
 # Install system dependencies:
 # - build-essential, curl
-# - libreoffice-writer, libreoffice-impress, libreoffice-common (headless docx & pptx conversion)
-# - fonts-liberation, fonts-dejavu-core, fonts-noto-core (flawless Cyrillic/Latin typography)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# - complete libreoffice suite (headless docx & pptx conversion)
+# - fonts-liberation, fonts-dejavu-core, fonts-noto-core, fonts-freefont-ttf (complete Cyrillic/Latin typography)
+RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    libreoffice-common \
-    libreoffice-writer \
-    libreoffice-impress \
-    libreoffice-calc \
-    default-jre-headless \
+    libreoffice \
     fonts-liberation \
     fonts-dejavu-core \
     fonts-noto-core \
+    fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python packages

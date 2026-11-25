@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: ddds-riskulov
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: frankfurt
+    autoDeploy: true
+    healthCheckPath: /api/rooms

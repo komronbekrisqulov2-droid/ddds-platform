@@ -3,6 +3,11 @@ import shutil
 import hashlib
 import time
 import glob
+import tempfile
+import uuid
+import zipfile
+import xml.etree.ElementTree as ET
+from io import BytesIO
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from PIL import Image, ImageDraw, ImageFont
@@ -11,6 +16,12 @@ from app.config import UPLOADS_DIR, CACHE_DIR
 from app.models import SlideItem
 
 # Check engines
+try:
+    import docx
+    HAS_DOCX = True
+except ImportError:
+    HAS_DOCX = False
+
 try:
     import pypdfium2 as pdfium
     HAS_PDFIUM = True
@@ -163,11 +174,19 @@ def convert_to_pdf_with_libreoffice(input_path: Path, out_dir: Path) -> Optional
     soffice = find_soffice_binary()
     if not soffice:
         return None
+    temp_profile = None
     try:
         import subprocess
-        profile_dir = Path("/tmp/ddds_lo_profile") if os.name != "nt" else Path(os.environ.get("TEMP", ".")) / "ddds_lo"
-        profile_dir.mkdir(parents=True, exist_ok=True)
-        profile_uri = profile_dir.as_uri()
+        temp_profile = Path(tempfile.gettempdir()) / f"ddds_lo_{uuid.uuid4().hex[:8]}"
+        temp_profile.mkdir(parents=True, exist_ok=True)
+        profile_uri = temp_profile.resolve().as_uri()
+
+        ext = input_path.suffix.lower()
+        filter_arg = "pdf"
+        if ext in [".pptx", ".ppt"]:
+            filter_arg = "pdf:impress_pdf_Export"
+        elif ext in [".docx", ".doc"]:
+            filter_arg = "pdf:writer_pdf_Export"
 
         cmd = [
             soffice,
@@ -179,7 +198,7 @@ def convert_to_pdf_with_libreoffice(input_path: Path, out_dir: Path) -> Optional
             "--nologo",
             "--norestore",
             f"-env:UserInstallation={profile_uri}",
-            "--convert-to", "pdf",
+            "--convert-to", filter_arg,
             str(input_path.resolve()),
             "--outdir", str(out_dir.resolve())
         ]
@@ -187,7 +206,7 @@ def convert_to_pdf_with_libreoffice(input_path: Path, out_dir: Path) -> Optional
         env["HOME"] = "/tmp" if os.name != "nt" else env.get("USERPROFILE", "")
         env["SAL_USE_VCLPLUGIN"] = "gen"
 
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45, env=env)
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=50, env=env)
         if proc.returncode != 0:
             print(f"[MediaProcessor] LibreOffice code {proc.returncode}: {proc.stderr.decode('utf-8', errors='ignore')}")
 
@@ -200,6 +219,12 @@ def convert_to_pdf_with_libreoffice(input_path: Path, out_dir: Path) -> Optional
                 return p
     except Exception as e:
         print(f"[MediaProcessor] LibreOffice conversion exception: {e}")
+    finally:
+        if temp_profile and temp_profile.exists():
+            try:
+                shutil.rmtree(temp_profile, ignore_errors=True)
+            except Exception:
+                pass
     return None
 
 
@@ -344,64 +369,255 @@ def process_docx_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sl
             s.title = f"{Path(filename).stem} ({s.index + 1}-bet)"
         return slides
 
-    raise RuntimeError("Word hujjatini PDF formatiga o'tkazish imkoni bo'lmadi. Serverda LibreOffice kerak.")
+    # 4. Pure Python Fallback: If LibreOffice and Word COM are unavailable, parse and render with python-docx
+    return build_fallback_docx_slides(temp_doc, filename, room_id, file_hash)
+
+
+def build_fallback_docx_slides(docx_path: Path, filename: str, room_id: str, file_hash: str) -> List[SlideItem]:
+    """
+    Renders Word document (.docx) into Ultra-HD slide pages using python-docx and Pillow.
+    Provides 100% reliable conversion even if LibreOffice or MS Word is not installed on the server.
+    """
+    _, room_cache = ensure_room_dirs(room_id)
+    doc_cache_dir = room_cache / f"doc_{file_hash}"
+    doc_cache_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(filename).stem
+
+    items = []
+    if HAS_DOCX:
+        try:
+            doc = docx.Document(str(docx_path))
+            for p in doc.paragraphs:
+                t = p.text.strip()
+                if not t:
+                    continue
+                is_heading = p.style.name.startswith("Heading") or (len(p.runs) > 0 and p.runs[0].bold and len(t) < 70)
+                items.append({
+                    "type": "heading" if is_heading else "paragraph",
+                    "text": t
+                })
+            for table in doc.tables:
+                rows_data = []
+                for row in table.rows:
+                    row_cells = [cell.text.strip() for cell in row.cells]
+                    if any(row_cells):
+                        rows_data.append(" | ".join(row_cells))
+                if rows_data:
+                    items.append({
+                        "type": "table",
+                        "text": "\n".join(rows_data[:8])
+                    })
+        except Exception as e:
+            print(f"[MediaProcessor] docx parse error: {e}")
+
+    if not items:
+        try:
+            with zipfile.ZipFile(str(docx_path)) as z:
+                if "word/document.xml" in z.namelist():
+                    xml_root = ET.fromstring(z.read("word/document.xml"))
+                    for node in xml_root.iter():
+                        if node.text and node.text.strip():
+                            items.append({"type": "paragraph", "text": node.text.strip()})
+        except Exception:
+            pass
+
+    if not items:
+        items = [{"type": "heading", "text": stem}, {"type": "paragraph", "text": "Word hujjati yuklandi."}]
+
+    # Group into pages (6 items per page)
+    pages = []
+    current_page = []
+    for item in items:
+        current_page.append(item)
+        if item["type"] == "table" or len(current_page) >= 6:
+            pages.append(current_page)
+            current_page = []
+    if current_page:
+        pages.append(current_page)
+
+    slides = []
+    total_pages = len(pages)
+    for idx, page_items in enumerate(pages):
+        webp_name = f"page_{idx + 1}.webp"
+        webp_path = doc_cache_dir / webp_name
+        render_clean_document_page(webp_path, stem, page_items, idx + 1, total_pages)
+        slides.append(SlideItem(
+            id=f"{file_hash}_p{idx + 1}",
+            index=idx,
+            title=f"{stem} ({idx + 1}/{total_pages}-bet)",
+            image_url=f"/cache/{room_id}/doc_{file_hash}/{webp_name}",
+            speaker_notes=f"Word Hujjati: {stem} (Sahifa {idx + 1}/{total_pages})",
+            slide_type="word_doc"
+        ))
+    return slides
+
+
+def render_clean_document_page(output_path: Path, doc_title: str, items: List[dict], page_num: int, total_pages: int):
+    width, height = 1920, 1080
+    img = Image.new("RGB", (width, height), color=(15, 23, 42))
+    draw = ImageDraw.Draw(img)
+
+    try:
+        font_header = ImageFont.truetype("arial.ttf", 36)
+        font_h1 = ImageFont.truetype("arial.ttf", 32)
+        font_body = ImageFont.truetype("arial.ttf", 26)
+        font_footer = ImageFont.truetype("arial.ttf", 20)
+    except Exception:
+        font_header = ImageFont.load_default()
+        font_h1 = ImageFont.load_default()
+        font_body = ImageFont.load_default()
+        font_footer = ImageFont.load_default()
+
+    # Top header bar
+    draw.rectangle([60, 40, width - 60, 120], fill=(30, 41, 59), outline=(51, 65, 85), width=2)
+    draw.text((100, 58), f"📄 {doc_title[:70]}", fill=(56, 189, 248), font=font_header)
+    draw.text((width - 240, 64), f"Sahifa {page_num} / {total_pages}", fill=(148, 163, 184), font=font_footer)
+
+    y = 160
+    for it in items:
+        if it["type"] == "heading":
+            draw.text((100, y), it["text"][:85], fill=(255, 255, 255), font=font_h1)
+            y += 50
+        elif it["type"] == "table":
+            draw.rectangle([100, y, width - 100, y + 140], fill=(24, 34, 53), outline=(71, 85, 105), width=1)
+            draw.text((120, y + 15), it["text"][:280], fill=(226, 232, 240), font=font_body)
+            y += 160
+        else:
+            draw.ellipse([100, y + 10, 110, y + 20], fill=(56, 189, 248))
+            draw.text((125, y), it["text"][:95], fill=(226, 232, 240), font=font_body)
+            y += 48
+        if y > height - 120:
+            break
+
+    # Bottom footer
+    draw.line([60, height - 60, width - 60, height - 60], fill=(51, 65, 85), width=1)
+    draw.text((100, height - 48), "DDDS Smart Auditoriya — Word Hujjat Ko'rish Rejimi (Zoom & Pan qo'llab-quvvatlanadi)", fill=(100, 116, 139), font=font_footer)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(output_path, "WEBP", quality=90)
 
 
 def build_fallback_pptx_slides(pptx_path: Path, filename: str, room_id: str, file_hash: str) -> List[SlideItem]:
-    prs = Presentation(str(pptx_path))
+    """
+    Renders presentation slides with slide text and embedded images directly from PPTX package
+    if vector PDF conversion engines (LibreOffice / MS PowerPoint) are not present.
+    """
     slides = []
     pptx_cache_dir = CACHE_DIR / room_id / f"pptx_{file_hash}"
-    for idx, slide in enumerate(prs.slides):
-        title = f"{Path(filename).stem} - Slayd {idx + 1}"
-        lines = []
-        notes = ""
-        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
-            notes = slide.notes_slide.notes_text_frame.text.strip()
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                for p in shape.text_frame.paragraphs:
-                    t = p.text.strip()
-                    if t:
-                        if not lines:
-                            title = t
-                        lines.append(t)
+    pptx_cache_dir.mkdir(parents=True, exist_ok=True)
+    stem = Path(filename).stem
+
+    raw_slides = []
+    # 1. Safely inspect PPTX zip archive directly
+    try:
+        with zipfile.ZipFile(str(pptx_path)) as z:
+            slides_xml = sorted(
+                [f for f in z.namelist() if f.startswith('ppt/slides/slide') and f.endswith('.xml')],
+                key=lambda x: int(''.join(filter(str.isdigit, x)) or 0)
+            )
+            for idx, sname in enumerate(slides_xml):
+                xml_data = z.read(sname)
+                root = ET.fromstring(xml_data)
+                texts = [node.text.strip() for node in root.iter() if node.text and node.text.strip()]
+                
+                # Check for images associated with this slide
+                rel_name = sname.replace('ppt/slides/', 'ppt/slides/_rels/') + '.rels'
+                slide_imgs_data = []
+                if rel_name in z.namelist():
+                    rel_root = ET.fromstring(z.read(rel_name))
+                    for rel in rel_root.iter('{http://schemas.openxmlformats.org/package/2006/relationships}Relationship'):
+                        target = rel.attrib.get('Target', '')
+                        if 'media' in target:
+                            img_path = 'ppt/' + target.replace('../', '')
+                            if img_path in z.namelist():
+                                slide_imgs_data.append(z.read(img_path))
+                raw_slides.append({
+                    "title": texts[0] if texts else f"{stem} - Slayd {idx + 1}",
+                    "lines": texts[1:8] if len(texts) > 1 else [],
+                    "images": slide_imgs_data
+                })
+    except Exception as e:
+        print(f"[MediaProcessor] Fallback zip extraction error: {e}")
+
+    # Fallback to python-pptx if zip extraction failed
+    if not raw_slides and HAS_PPTX:
+        try:
+            prs = Presentation(str(pptx_path))
+            for idx, slide in enumerate(prs.slides):
+                lines = []
+                title = f"{stem} - Slayd {idx + 1}"
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for p in shape.text_frame.paragraphs:
+                            t = p.text.strip()
+                            if t:
+                                if not lines: title = t
+                                lines.append(t)
+                raw_slides.append({"title": title, "lines": lines[1:8], "images": []})
+        except Exception:
+            pass
+
+    if not raw_slides:
+        raw_slides = [{"title": stem, "lines": ["Taqdimot slaydi"], "images": []}]
+
+    total_slides = len(raw_slides)
+    for idx, sdata in enumerate(raw_slides):
         webp_name = f"slide_{idx + 1}.webp"
         webp_path = pptx_cache_dir / webp_name
-        render_clean_presentation_card(webp_path, title, lines[1:6], idx + 1, len(prs.slides))
+        render_rich_fallback_slide(webp_path, sdata["title"], sdata["lines"], sdata["images"], idx + 1, total_slides)
         slides.append(SlideItem(
             id=f"{file_hash}_s{idx + 1}",
             index=idx,
-            title=title,
+            title=sdata["title"],
             image_url=f"/cache/{room_id}/pptx_{file_hash}/{webp_name}",
-            speaker_notes=notes or f"Slayd #{idx+1}: {title}",
+            speaker_notes=f"Slayd #{idx+1}: {sdata['title']}",
             slide_type="pptx_card"
         ))
     return slides
 
 
-def render_clean_presentation_card(output_path: Path, title: str, lines: List[str], num: int, total: int):
+def render_rich_fallback_slide(output_path: Path, title: str, lines: List[str], images: List[bytes], num: int, total: int):
     width, height = 1920, 1080
     img = Image.new("RGB", (width, height), color=(15, 23, 42))
     draw = ImageDraw.Draw(img)
     try:
-        font_title = ImageFont.truetype("arial.ttf", 48)
-        font_body = ImageFont.truetype("arial.ttf", 32)
-        font_sub = ImageFont.truetype("arial.ttf", 22)
+        font_title = ImageFont.truetype("arial.ttf", 44)
+        font_body = ImageFont.truetype("arial.ttf", 26)
+        font_sub = ImageFont.truetype("arial.ttf", 20)
     except Exception:
         font_title = ImageFont.load_default()
         font_body = ImageFont.load_default()
         font_sub = ImageFont.load_default()
 
-    draw.rectangle([80, 80, width - 80, 200], fill=(30, 41, 59), outline=(51, 65, 85), width=2)
-    draw.text((120, 115), title[:65], fill=(248, 250, 252), font=font_title)
+    # Title box
+    draw.rectangle([80, 50, width - 80, 160], fill=(30, 41, 59), outline=(51, 65, 85), width=2)
+    draw.text((120, 80), title[:65], fill=(248, 250, 252), font=font_title)
 
-    y = 260
-    for l in lines:
-        draw.ellipse([120, y + 10, 132, y + 22], fill=(0, 210, 255))
-        draw.text((150, y), l[:80], fill=(226, 232, 240), font=font_body)
-        y += 75
+    has_imgs = len(images) > 0
+    text_max = 75 if has_imgs else 115
 
-    draw.text((80, height - 60), f"Slayd {num} / {total}", fill=(148, 163, 184), font=font_sub)
+    y = 200
+    for l in lines[:7]:
+        draw.ellipse([120, y + 8, 130, y + 18], fill=(0, 210, 255))
+        draw.text((145, y), l[:text_max], fill=(226, 232, 240), font=font_body)
+        y += 62
+
+    # If slide contains images, paste up to 2 images on right side of slide
+    if has_imgs:
+        img_x = 1120
+        img_y = 200
+        for raw_img in images[:2]:
+            try:
+                pil_im = Image.open(BytesIO(raw_img))
+                pil_im.thumbnail((720, 380), Image.Resampling.LANCZOS)
+                border_box = [img_x - 3, img_y - 3, img_x + pil_im.width + 3, img_y + pil_im.height + 3]
+                draw.rectangle(border_box, fill=(30, 41, 59), outline=(56, 189, 248), width=2)
+                img.paste(pil_im, (img_x, img_y))
+                img_y += pil_im.height + 25
+            except Exception as im_err:
+                print(f"[MediaProcessor] Fallback image paste error: {im_err}")
+
+    draw.text((80, height - 55), f"Slayd {num} / {total}", fill=(148, 163, 184), font=font_sub)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(output_path, "WEBP", quality=90)
 

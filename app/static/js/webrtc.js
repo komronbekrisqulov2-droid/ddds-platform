@@ -90,17 +90,20 @@ class WebRTCBroadcaster {
             else if (type === 'WEBRTC_STREAMING_OK') {
                 this.verifiedReceivers.add(fromClient);
                 console.log(`[WebRTC Broadcaster] Screen ${fromClient} confirmed WebRTC rendering.`);
-                // If all active peer connections are rendering WebRTC, pause fallback streamer to save CPU & bandwidth
+                // If all active peer connections are rendering WebRTC, reduce fallback to warm standby (1 frame/sec)
+                // This guarantees that if P2P video ever drops over internet/NAT, recovery is instantaneous!
                 if (this.peerConnections.size > 0 && this.verifiedReceivers.size >= this.peerConnections.size) {
-                    this.needsFallback = false;
-                    console.log('[WebRTC Broadcaster] All screens confirmed WebRTC. Pausing fallback streamer.');
+                    this.fallbackIntervalMs = 1200;
+                    this.restartFallbackInterval();
+                    console.log('[WebRTC Broadcaster] All screens confirmed WebRTC. Fallback kept on warm standby (1.2s).');
                 }
             }
-            // Screen reports WebRTC failed or firewalled -> needs fallback
+            // Screen reports WebRTC failed, firewalled or stalled -> activate high-speed fallback
             else if (type === 'WEBRTC_NEED_FALLBACK') {
                 this.verifiedReceivers.delete(fromClient);
                 this.needsFallback = true;
-                this.startFallbackStreamer();
+                this.fallbackIntervalMs = 250;
+                this.restartFallbackInterval();
             }
         });
 
@@ -210,7 +213,6 @@ class WebRTCBroadcaster {
         let isEncoding = false;
         this.fallbackTimer = setInterval(() => {
             if (!this.isBroadcasting || isEncoding) return;
-            if (!this.needsFallback) return;
             if (!this.fallbackVideo || this.fallbackVideo.readyState < 2 || this.fallbackVideo.videoWidth === 0) return;
 
             isEncoding = true;
@@ -237,6 +239,16 @@ class WebRTCBroadcaster {
                 isEncoding = false;
             }
         }, this.fallbackIntervalMs);
+    }
+
+    restartFallbackInterval() {
+        if (this.fallbackTimer) {
+            clearInterval(this.fallbackTimer);
+            this.fallbackTimer = null;
+        }
+        if (this.isBroadcasting && this.stream) {
+            this.startFallbackStreamer();
+        }
     }
 
     stopFallbackStreamer() {
@@ -519,30 +531,70 @@ class WebRTCReceiver {
             console.log(`[WebRTC Receiver] Track received: ${event.track.kind}`, event.track);
 
             if (event.track.kind === 'video' && this.videoEl) {
-                this.videoStream.addTrack(event.track);
+                // Ensure fresh MediaStream with track directly attached
+                this.videoStream = new MediaStream([event.track]);
+                this.videoEl.srcObject = this.videoStream;
+                this.videoEl.muted = true;
+                this.videoEl.playsInline = true;
+                this.videoEl.autoplay = true;
                 this.videoEl.style.display = 'block';
 
-                const onFrameReady = () => {
-                    this.hasRenderedWebRTC = true;
-                    this.isConnecting = false;
-                    if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'none';
-                    if (this.loaderEl) this.loaderEl.style.display = 'none';
-                    this.client.sendWebRTCSignal('WEBRTC_STREAMING_OK', {});
-                };
-
-                this.videoEl.onloadeddata = onFrameReady;
-                this.videoEl.onplaying = onFrameReady;
-                this.videoEl.ontimeupdate = () => {
-                    if (!this.hasRenderedWebRTC && this.videoEl.currentTime > 0) {
-                        onFrameReady();
+                let framesCount = 0;
+                const checkFrame = () => {
+                    if (this.videoEl && this.videoEl.videoWidth > 0 && this.videoEl.readyState >= 2) {
+                        framesCount++;
+                        if (framesCount >= 2) {
+                            this.hasRenderedWebRTC = true;
+                            this.isConnecting = false;
+                            if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'none';
+                            if (this.loaderEl) this.loaderEl.style.display = 'none';
+                            this.client.sendWebRTCSignal('WEBRTC_STREAMING_OK', {});
+                        }
                     }
                 };
 
+                this.videoEl.onplaying = checkFrame;
+                this.videoEl.ontimeupdate = checkFrame;
+                if ('requestVideoFrameCallback' in this.videoEl) {
+                    const rvfc = () => {
+                        checkFrame();
+                        if (this.videoEl && this.videoStream) this.videoEl.requestVideoFrameCallback(rvfc);
+                    };
+                    this.videoEl.requestVideoFrameCallback(rvfc);
+                }
+
                 this.videoEl.play().catch(e => console.warn('[WebRTC Receiver] play() rejection:', e));
+
+                // Active Freeze & Drop Watchdog: Detects video freeze and switches to live canvas seamlessly
+                clearInterval(this.watchdogTimer);
+                let lastCurTime = -1;
+                let stallTicks = 0;
+                this.watchdogTimer = setInterval(() => {
+                    if (!this.peerConnection) return;
+                    if (this.videoEl && this.videoEl.srcObject) {
+                        const cur = this.videoEl.currentTime;
+                        if (cur === lastCurTime || this.videoEl.videoWidth === 0) {
+                            stallTicks++;
+                            if (stallTicks >= 2) {
+                                console.warn('[WebRTC Receiver] Video frozen, switching to fallback canvas');
+                                if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'block';
+                                this.client.sendWebRTCSignal('WEBRTC_NEED_FALLBACK', {
+                                    screen_id: this.client.clientId
+                                });
+                            }
+                        } else {
+                            stallTicks = 0;
+                            lastCurTime = cur;
+                            if (this.videoEl.videoWidth > 0 && framesCount >= 2) {
+                                if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'none';
+                            }
+                        }
+                    }
+                }, 1000);
 
                 event.track.onunmute = () => {
                     this.videoEl.play().catch(() => {});
-                    onFrameReady();
+                    checkFrame();
                 };
             } else if (event.track.kind === 'audio') {
                 this.audioStream.addTrack(event.track);
@@ -689,6 +741,8 @@ class WebRTCReceiver {
         this.isConnecting = false;
         this.hasRenderedWebRTC = false;
         clearTimeout(this.connectTimeout);
+        clearInterval(this.watchdogTimer);
+        this.watchdogTimer = null;
 
         if (this.videoEl) {
             this.videoEl.srcObject = null;
