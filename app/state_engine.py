@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+import shutil
 from typing import Dict, Any, List, Optional
 from fastapi import WebSocket
 
@@ -9,7 +10,9 @@ from app.models import (
     RoomState, ScreenState, LaserState, DrawingStroke, VideoSyncState,
     DisplayMode, MediaType, ClientRole, ConnectedClient, SlideItem, PresentationDeck
 )
-from app.media_processor import get_default_starter_slides, get_whiteboard_permanent_slides
+from app.media_processor import (
+    get_default_starter_slides, get_whiteboard_permanent_slides, purge_deck_disk_files
+)
 
 
 class RoomStateManager:
@@ -333,6 +336,14 @@ class RoomStateManager:
             if room_id in self.active_sockets:
                 del self.active_sockets[room_id]
             del self.rooms[room_id]
+
+            # Completely purge cache and upload folders from disk
+            room_cache = CACHE_DIR / room_id
+            room_upload = UPLOADS_DIR / room_id
+            if room_cache.exists():
+                shutil.rmtree(room_cache, ignore_errors=True)
+            if room_upload.exists():
+                shutil.rmtree(room_upload, ignore_errors=True)
             return True
 
     async def change_slide(self, room_id: str, slide_index: int, target_screen: str = "both"):
@@ -435,7 +446,8 @@ class RoomStateManager:
             "timestamp": time.time()
         }, exclude_client_id=sender_id)
 
-    async def set_deck_slides(self, room_id: str, deck_name: str, slides: List[SlideItem], format_type: str = "pptx"):
+    async def set_deck_slides(self, room_id: str, deck_name: str, slides: List[SlideItem],
+                              format_type: str = "pdf", auto_activate: bool = True):
         room = self.rooms.get(room_id)
         if not room:
             return
@@ -447,32 +459,37 @@ class RoomStateManager:
             format=format_type,
             slide_count=len(slides),
             slides=slides,
-            is_active=True,
+            is_active=auto_activate,
             is_permanent=False
         )
 
-        # Mark all other decks inactive
-        for d in room.saved_decks:
-            d.is_active = False
-
-        # Enforce memory retention limit: Keep at most 4 uploaded non-permanent decks (+ permanent whiteboard)
+        # Enforce memory & disk retention limit: Keep at most 4 uploaded non-permanent decks (+ permanent whiteboard)
         non_perm = [d for d in room.saved_decks if not getattr(d, 'is_permanent', False)]
         while len(non_perm) >= 4:
             oldest = non_perm.pop(0)
             room.saved_decks = [d for d in room.saved_decks if d.id != oldest.id]
-        
-        # Add new deck to portfolio
-        room.saved_decks.append(new_deck)
+            purge_deck_disk_files(room_id, oldest)
 
-        # Set as currently active
-        room.slides = slides
-        room.active_deck_name = deck_name
-        room.active_deck_id = deck_id
-        room.screen1.slide_index = 0
-        room.screen2.slide_index = 0 if room.display_mode == DisplayMode.MIRROR else (1 if len(slides) > 1 else 0)
-        room.active_media_type = MediaType.SLIDES
-        room.drawing_strokes.clear()
-        await self.broadcast_state(room_id, reason="NEW_DECK_LOADED")
+        if auto_activate:
+            # Mark all other decks inactive
+            for d in room.saved_decks:
+                d.is_active = False
+
+            room.saved_decks.append(new_deck)
+            # Set as currently active
+            room.slides = slides
+            room.active_deck_name = deck_name
+            room.active_deck_id = deck_id
+            room.screen1.slide_index = 0
+            room.screen2.slide_index = 0 if room.display_mode == DisplayMode.MIRROR else (1 if len(slides) > 1 else 0)
+            room.active_media_type = MediaType.SLIDES
+            room.drawing_strokes.clear()
+            await self.broadcast_state(room_id, reason="NEW_DECK_LOADED")
+        else:
+            # Preserve current slide on monitors; just save to portfolio
+            new_deck.is_active = False
+            room.saved_decks.append(new_deck)
+            await self.broadcast_state(room_id, reason="NEW_DECK_SAVED")
 
     async def activate_deck(self, room_id: str, deck_id: str):
         room = self.rooms.get(room_id)
@@ -507,6 +524,9 @@ class RoomStateManager:
         if deck and getattr(deck, 'is_permanent', False):
             return
 
+        if deck:
+            purge_deck_disk_files(room_id, deck)
+
         room.saved_decks = [d for d in room.saved_decks if d.id != deck_id]
         # If we deleted the active deck, activate the first available
         if room.active_deck_id == deck_id and room.saved_decks:
@@ -518,6 +538,11 @@ class RoomStateManager:
         room = self.rooms.get(room_id)
         if not room:
             return
+
+        for d in room.saved_decks:
+            if not getattr(d, 'is_permanent', False):
+                purge_deck_disk_files(room_id, d)
+
         # Keep permanent decks (e.g. permanent whiteboard)
         room.saved_decks = [d for d in room.saved_decks if getattr(d, 'is_permanent', False)]
         if room.saved_decks:

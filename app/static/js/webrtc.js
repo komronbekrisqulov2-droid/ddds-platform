@@ -565,32 +565,21 @@ class WebRTCReceiver {
 
                 this.videoEl.play().catch(e => console.warn('[WebRTC Receiver] play() rejection:', e));
 
-                // Active Freeze & Drop Watchdog: Detects video freeze and switches to live canvas seamlessly
+                // Active Health Watchdog: Ensures video track remains healthy without false alarms on static slides
                 clearInterval(this.watchdogTimer);
-                let lastCurTime = -1;
-                let stallTicks = 0;
                 this.watchdogTimer = setInterval(() => {
                     if (!this.peerConnection) return;
-                    if (this.videoEl && this.videoEl.srcObject) {
-                        const cur = this.videoEl.currentTime;
-                        if (cur === lastCurTime || this.videoEl.videoWidth === 0) {
-                            stallTicks++;
-                            if (stallTicks >= 2) {
-                                console.warn('[WebRTC Receiver] Video frozen, switching to fallback canvas');
-                                if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'block';
-                                this.client.sendWebRTCSignal('WEBRTC_NEED_FALLBACK', {
-                                    screen_id: this.client.clientId
-                                });
-                            }
-                        } else {
-                            stallTicks = 0;
-                            lastCurTime = cur;
-                            if (this.videoEl.videoWidth > 0 && framesCount >= 2) {
-                                if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'none';
-                            }
-                        }
+                    if (this.peerConnection.iceConnectionState === 'failed' || this.peerConnection.iceConnectionState === 'disconnected') {
+                        console.warn('[WebRTC Receiver] ICE connection disconnected, activating fallback');
+                        if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'block';
+                        this.client.sendWebRTCSignal('WEBRTC_NEED_FALLBACK', {
+                            screen_id: this.client.clientId
+                        });
+                    } else if (this.videoEl && this.videoEl.videoWidth > 0 && this.hasRenderedWebRTC) {
+                        // Keep fallback canvas hidden as long as WebRTC video is rendering
+                        if (this.fallbackCanvas) this.fallbackCanvas.style.display = 'none';
                     }
-                }, 1000);
+                }, 2000);
 
                 event.track.onunmute = () => {
                     this.videoEl.play().catch(() => {});

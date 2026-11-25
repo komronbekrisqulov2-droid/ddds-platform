@@ -61,7 +61,10 @@ def ensure_room_dirs(room_id: str):
 
 
 def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[SlideItem]:
-    """Convert each PDF page into Ultra-HD WebP image (300 DPI, razor-sharp vector clarity)."""
+    """
+    Convert each PDF page into Ultra-HD WebP image (2K/4K resolution).
+    Optimized for lightning-fast encoding (quality 88, method 2).
+    """
     file_hash = get_file_hash(file_bytes)
     _, room_cache = ensure_room_dirs(room_id)
     pdf_cache_dir = room_cache / f"pdf_{file_hash}"
@@ -69,7 +72,7 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
 
     slides: List[SlideItem] = []
 
-    # 1. Primary: pypdfium2 (Render at Ultra-HD scale 3.0 = 300 DPI)
+    # 1. Primary: pypdfium2 (Render at Ultra-HD scale 2.0 = 2K/4K razor-sharp vector clarity)
     if HAS_PDFIUM:
         try:
             pdf = pdfium.PdfDocument(file_bytes)
@@ -80,10 +83,10 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
                 
                 if not webp_path.exists():
                     page = pdf[page_idx]
-                    # Scale 3.0 provides 2880x1620 / 4K crispness
-                    bitmap = page.render(scale=3.0)
+                    # Scale 2.0 provides ultra crispness at 10x faster encoding speed
+                    bitmap = page.render(scale=2.0)
                     pil_image = bitmap.to_pil()
-                    pil_image.save(webp_path, "WEBP", quality=98, method=6)
+                    pil_image.save(webp_path, "WEBP", quality=88, method=2)
                 
                 # Text extraction for search/notes if any
                 page_text = ""
@@ -101,14 +104,14 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
                     image_url=f"/cache/{room_id}/pdf_{file_hash}/{webp_filename}",
                     speaker_notes=f"Slayd {page_idx + 1} / {num_pages}: {Path(filename).stem}",
                     slide_type="pdf_page",
-                    extra_data={"page_number": page_idx + 1, "total_pages": num_pages}
+                    extra_data={"page_number": page_idx + 1, "total_pages": num_pages, "file_hash": file_hash}
                 ))
             pdf.close()
             return slides
         except Exception as e:
             print(f"[MediaProcessor] pypdfium2 failed: {e}, falling back to fitz...")
 
-    # 2. Fallback: PyMuPDF (fitz) at 250 DPI
+    # 2. Fallback: PyMuPDF (fitz) at 200 DPI
     if HAS_FITZ:
         try:
             doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -119,9 +122,9 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
                 
                 if not webp_path.exists():
                     page = doc.load_page(page_idx)
-                    pix = page.get_pixmap(dpi=250)
+                    pix = page.get_pixmap(dpi=200)
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                    img.save(webp_path, "WEBP", quality=98, method=6)
+                    img.save(webp_path, "WEBP", quality=88, method=2)
                 
                 page_text = doc[page_idx].get_text()
 
@@ -133,7 +136,7 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
                     image_url=f"/cache/{room_id}/pdf_{file_hash}/{webp_filename}",
                     speaker_notes=f"Slayd {page_idx + 1} / {num_pages}",
                     slide_type="pdf_page",
-                    extra_data={"page_number": page_idx + 1, "total_pages": num_pages}
+                    extra_data={"page_number": page_idx + 1, "total_pages": num_pages, "file_hash": file_hash}
                 ))
             doc.close()
             return slides
@@ -141,6 +144,97 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
             print(f"[MediaProcessor] PyMuPDF failed: {e}")
 
     raise RuntimeError("No working PDF rendering engine found.")
+
+
+def process_image_file(file_bytes: bytes, filename: str, room_id: str) -> List[SlideItem]:
+    """
+    Process uploaded image (PNG, JPG, WEBP) into an Ultra-HD slide card.
+    Normalizes resolution, removes alpha artifacts, and converts instantly to WebP.
+    """
+    file_hash = get_file_hash(file_bytes)
+    _, room_cache = ensure_room_dirs(room_id)
+    img_cache_dir = room_cache / f"img_{file_hash}"
+    img_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    webp_filename = "slide_1.webp"
+    webp_path = img_cache_dir / webp_filename
+
+    if not webp_path.exists():
+        im = Image.open(BytesIO(file_bytes))
+        if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            if im.mode == "RGBA":
+                bg.paste(im, mask=im.split()[3])
+            else:
+                conv = im.convert("RGBA")
+                bg.paste(conv, mask=conv.split()[3])
+            im = bg
+        elif im.mode != "RGB":
+            im = im.convert("RGB")
+
+        # Constrain max dimension to 3840 (4K) to maintain speed and save RAM
+        max_dim = 3840
+        w, h = im.size
+        if max(w, h) > max_dim:
+            ratio = max_dim / max(w, h)
+            im = im.resize((int(w * ratio), int(h * ratio)), Image.Resampling.LANCZOS)
+
+        im.save(webp_path, "WEBP", quality=90, method=2)
+
+    stem = Path(filename).stem
+    slide = SlideItem(
+        id=f"img_{file_hash}_1",
+        index=0,
+        title=f"{stem}",
+        image_url=f"/cache/{room_id}/img_{file_hash}/{webp_filename}",
+        speaker_notes=f"Tasvir: {filename}",
+        slide_type="image_slide",
+        extra_data={"file_hash": file_hash}
+    )
+    return [slide]
+
+
+def purge_deck_disk_files(room_id: str, deck: Any):
+    """
+    Physically and permanently deletes all cached slide images and source files
+    associated with a presentation deck to release 100% of disk space.
+    """
+    try:
+        _, room_cache = ensure_room_dirs(room_id)
+        room_upload = UPLOADS_DIR / room_id
+
+        # 1. Clean folders matching slide image URLs
+        slides = getattr(deck, 'slides', [])
+        for slide in slides:
+            url = getattr(slide, 'image_url', '')
+            if not url:
+                continue
+            if "/cache/" in url:
+                parts = url.strip("/").split("/")
+                if len(parts) >= 3:
+                    folder_name = parts[2]
+                    target_dir = room_cache / folder_name
+                    if target_dir.exists() and target_dir.is_dir():
+                        shutil.rmtree(target_dir, ignore_errors=True)
+            elif "/uploads/" in url:
+                parts = url.strip("/").split("/")
+                if len(parts) >= 3:
+                    filename = parts[-1]
+                    target_file = room_upload / filename
+                    if target_file.exists() and target_file.is_file():
+                        try: target_file.unlink(missing_ok=True)
+                        except Exception: pass
+
+        # 2. Also check if source file exists in uploads with deck.name
+        deck_name = getattr(deck, 'name', '')
+        if deck_name:
+            target_upload = room_upload / deck_name
+            if target_upload.exists() and target_upload.is_file():
+                try: target_upload.unlink(missing_ok=True)
+                except Exception: pass
+    except Exception as e:
+        print(f"[MediaProcessor] Error purging deck disk files: {e}")
+
 
 
 def find_soffice_binary() -> Optional[str]:

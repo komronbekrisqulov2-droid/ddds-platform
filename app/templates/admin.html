@@ -36,9 +36,9 @@
     <!-- Center Status Group -->
     <div class="top-status-group">
         <div class="ip-pill">
-            <span>📶 Wi-Fi IP:</span>
-            <span style="color: #38bdf8;" id="top-wifi-ip">{{ wifi_url }}</span>
-            <button class="ip-copy-btn" onclick="copyToClipboard('{{ wifi_url }}')">Nusxalash 📋</button>
+            <span>{{ url_label }}:</span>
+            <span style="color: #38bdf8;" id="top-wifi-ip">{{ display_url }}</span>
+            <button class="ip-copy-btn" onclick="copyToClipboard('{{ display_url }}')">Nusxalash 📋</button>
         </div>
 
         <span style="color: #475569;">|</span>
@@ -273,23 +273,37 @@
             <!-- Left: Upload Zone -->
             <div style="display: flex; flex-direction: column; gap: 14px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="font-size: 1rem; font-weight: 700;">📥 Yangi Taqdimot / Hujjat Yuklash</h3>
-                    <span class="badge badge-primary">PPTX, WORD, PDF, PNG, MP4</span>
+                    <h3 style="font-size: 1rem; font-weight: 700;">📥 Yangi Taqdimot / Rasmlar Yuklash</h3>
+                    <span class="badge badge-primary">PDF, PNG, JPG, WEBP</span>
                 </div>
 
                 <div class="upload-dropzone-box" onclick="document.getElementById('deck-file-input').click()">
                     <div class="dropzone-folder-icon">📁</div>
                     <div style="font-weight: 700; font-size: 1rem; color: white; margin-bottom: 4px;">
-                        Taqdimot yoki Word hujjatini bu yerga tashlang yoki tanlang
+                        Taqdimot (PDF) yoki Rasm faylini bu yerga tashlang yoki tanlang
                     </div>
                     <div style="font-size: 0.82rem; color: #64748b;">
-                        PowerPoint (.pptx, .ppt), Word (.docx, .doc) yoki PDF (200 MB gacha)
+                        PDF taqdimot, PNG, JPG yoki WEBP rasmlar (100 MB gacha)
                     </div>
-                    <input type="file" id="deck-file-input" accept=".pptx,.ppt,.pdf,.docx,.doc,.png,.jpg,.jpeg,.mp4" style="display: none;" onchange="uploadPresentationFile(event)">
+                    <input type="file" id="deck-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.mp4,.webm" style="display: none;" onchange="uploadPresentationFile(event)">
                 </div>
 
                 <div>
                     <input type="text" id="deck-title-input" placeholder="Taqdimot mavzusi yoki nomi (ixtiyoriy)..." style="width: 100%; padding: 10px 14px; background: #070c17; border: 1px solid #1e293b; border-radius: 8px; color: white;">
+                </div>
+
+                <!-- Auto-Activate Switch -->
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #070c17; border: 1px solid #1e293b; border-radius: 8px;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.85rem; color: #e2e8f0;">⚡ Yuklanganda avtomatik efirga uzatish</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">O'chirilsa, dars to'xtamaydi, yangi fayl zaxiraga olinadi</div>
+                    </div>
+                    <label style="position: relative; display: inline-block; width: 44px; height: 24px; cursor: pointer;">
+                        <input type="checkbox" id="auto-activate-toggle" checked style="display: none;" onchange="toggleAutoSwitchLabel(this)">
+                        <div id="auto-toggle-bg" style="width: 44px; height: 24px; background: #10b981; border-radius: 12px; transition: 0.3s; position: relative;">
+                            <div id="auto-toggle-knob" style="position: absolute; top: 2px; right: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; transition: 0.3s;"></div>
+                        </div>
+                    </label>
                 </div>
 
                 <button class="btn btn-primary" style="width: 100%;" onclick="document.getElementById('deck-file-input').click()">
@@ -307,8 +321,8 @@
                     </div>
                 </div>
 
-                <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
-                    ⚡ <strong>Alohida portfel:</strong> Har bir yuklangan PPTX alohida taqdimot sifatida saqlanadi. Slaydlar dizayni, formulalar va shriftlar 100% o'zgarmasdan namoyish etiladi.
+                <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4; background: #070c17; border-left: 3px solid #38bdf8; padding: 8px 12px; border-radius: 0 8px 8px 0;">
+                    💡 <strong>100% Sifat Kafolati:</strong> Taqdimotingiz (PPTX) yoki Word hujjati formulalari, shriftlari va dizayni 100% buzilmasdan, tiniq chiqishi uchun ularni PowerPoint yoki Word'da <strong>PDF qilib saqlab</strong>, so'ng yuklang.
                 </div>
             </div>
 
@@ -872,6 +886,21 @@ function renderPortfolioCards() {
     });
 }
 
+function toggleAutoSwitchLabel(input) {
+    const bg = document.getElementById('auto-toggle-bg');
+    const knob = document.getElementById('auto-toggle-knob');
+    if (!bg || !knob) return;
+    if (input.checked) {
+        bg.style.background = '#10b981';
+        knob.style.right = '3px';
+        knob.style.left = 'auto';
+    } else {
+        bg.style.background = '#475569';
+        knob.style.left = '3px';
+        knob.style.right = 'auto';
+    }
+}
+
 function uploadPresentationFile(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -879,9 +908,14 @@ function uploadPresentationFile(event) {
     const titleInput = document.getElementById('deck-title-input');
     const customTitle = titleInput ? titleInput.value.trim() : '';
 
+    const autoToggle = document.getElementById('auto-activate-toggle');
+    const autoActivate = autoToggle ? autoToggle.checked : true;
+
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('auto_activate', autoActivate ? 'true' : 'false');
     if (customTitle) formData.append('custom_name', customTitle);
+    if (savedAdminToken) formData.append('token', savedAdminToken);
 
     const progContainer = document.getElementById('upload-progress-container');
     const progBar = document.getElementById('upload-progress-bar');
@@ -895,7 +929,7 @@ function uploadPresentationFile(event) {
         if (progLabel) progLabel.textContent = `Yuklanmoqda: ${file.name}...`;
     }
 
-    logEvent(`Taqdimot yuklanmoqda: ${file.name}...`);
+    logEvent(`Fayl yuklanmoqda: ${file.name}...`);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `/api/room/${ROOM_ID}/upload`, true);
@@ -906,7 +940,7 @@ function uploadPresentationFile(event) {
             if (progBar) progBar.style.width = `${percent}%`;
             if (progPercent) progPercent.textContent = `${percent}%`;
             if (percent === 100 && progLabel) {
-                progLabel.textContent = 'Serverda qayta ishlanmoqda (Vektor slaydlar yaratilmoqda)...';
+                progLabel.textContent = 'Serverda tezkor qayta ishlanmoqda (Ultra-HD WebP slaydlar)...';
             }
         }
     };
@@ -921,7 +955,12 @@ function uploadPresentationFile(event) {
                 if (progContainer) {
                     if (progLabel) progLabel.textContent = 'Muvaffaqiyatli yuklandi! ✨';
                     if (progBar) progBar.style.width = '100%';
-                    setTimeout(() => { progContainer.style.display = 'none'; }, 2000);
+                    setTimeout(() => { progContainer.style.display = 'none'; }, 1500);
+                }
+                if (data.auto_activated === false) {
+                    showToast(`✅ "${file.name}" kutubxonaga saqlandi! Monitordagi darsingiz to'xtatilmadi.`, "success");
+                } else {
+                    showToast(`✨ "${file.name}" yuklandi va to'g'ridan-to'g'ri efirga uzatildi!`, "success");
                 }
             } catch (err) {
                 logEvent(`Yuklandi: ${file.name}`);
@@ -947,22 +986,22 @@ function uploadPresentationFile(event) {
 
 async function activateDeck(deckId) {
     try {
-        await fetch(`/api/room/${ROOM_ID}/activate_deck/${deckId}`, { method: 'POST' });
+        await fetch(`/api/room/${ROOM_ID}/activate_deck/${deckId}?token=${encodeURIComponent(savedAdminToken || '')}`, { method: 'POST' });
         logEvent(`Deck efirga uzatildi: ${deckId}`);
     } catch (e) {}
 }
 
 async function deleteDeck(deckId) {
-    if (!confirm("Ushbu taqdimotni o'chirishni xohlaysizmi?")) return;
+    if (!confirm("Ushbu taqdimotni o'chirishni xohlaysizmi? U diskdan ham to'liq o'chiriladi.")) return;
     try {
-        await fetch(`/api/room/${ROOM_ID}/delete_deck/${deckId}`, { method: 'DELETE' });
+        await fetch(`/api/room/${ROOM_ID}/delete_deck/${deckId}?token=${encodeURIComponent(savedAdminToken || '')}`, { method: 'DELETE' });
     } catch (e) {}
 }
 
 async function clearPortfolio() {
-    if (!confirm("Barcha saqlangan taqdimotlarni tozalashni xohlaysizmi?")) return;
+    if (!confirm("Barcha saqlangan taqdimotlarni tozalashni xohlaysizmi? Ular diskdan ham to'liq o'chiriladi.")) return;
     try {
-        await fetch(`/api/room/${ROOM_ID}/clear_decks`, { method: 'POST' });
+        await fetch(`/api/room/${ROOM_ID}/clear_decks?token=${encodeURIComponent(savedAdminToken || '')}`, { method: 'POST' });
     } catch (e) {}
 }
 

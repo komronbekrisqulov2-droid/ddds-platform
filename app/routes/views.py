@@ -70,11 +70,25 @@ async def admin_dashboard_page(request: Request, room_id: str):
     join_url = f"{base_url}/join/{room_id}"
     qr_data_uri = generate_qr_data_uri(join_url, box_size=8, border=1)
 
-    # Local Wi-Fi networking detection
+    # Detect public cloud deployment vs local offline Wi-Fi
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    is_cloud = (
+        "onrender.com" in host or "koyeb.app" in host or
+        ("." in host and not host.split(":")[0].replace(".", "").isdigit() and "localhost" not in host)
+    )
+
     wifi_ip = get_local_ip()
     port = request.url.port or 8000
-    wifi_url = f"http://{wifi_ip}:{port}"
-    tv_url = f"http://{wifi_ip}:{port}/tv"
+    if is_cloud:
+        display_url = base_url
+        url_label = "🌐 Bulut Domeni"
+        tv_url = f"{base_url}/tv"
+    else:
+        display_url = f"http://{wifi_ip}:{port}"
+        url_label = "📶 Wi-Fi IP"
+        tv_url = f"http://{wifi_ip}:{port}/tv"
+
+    wifi_url = display_url
     hotspot_url = f"http://192.168.137.1:{port}/tv"
 
     admin_token = state_manager.create_auth_token(room_id)
@@ -87,6 +101,9 @@ async def admin_dashboard_page(request: Request, room_id: str):
             "admin_token": admin_token,
             "qr_data_uri": qr_data_uri,
             "join_url": join_url,
+            "display_url": display_url,
+            "url_label": url_label,
+            "is_cloud": is_cloud,
             "wifi_ip": wifi_ip,
             "wifi_url": wifi_url,
             "tv_url": tv_url,

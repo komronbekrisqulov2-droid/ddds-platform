@@ -1,26 +1,14 @@
-# DDDS Cloud - Production Dockerfile
+# DDDS Cloud - Production Dockerfile (Ultra-fast, Lightweight)
 FROM python:3.11-slim
 
-# Prevent Python from writing .pyc and buffer stdout
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV HOME=/tmp
-ENV SAL_USE_VCLPLUGIN=gen
 
 WORKDIR /app
 
-# Install system dependencies:
-# - build-essential, curl
-# - complete libreoffice suite (headless docx & pptx conversion)
-# - fonts-liberation, fonts-dejavu-core, fonts-noto-core, fonts-freefont-ttf (complete Cyrillic/Latin typography)
-RUN apt-get update && apt-get install -y \
-    build-essential \
+# Install minimal required system tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    libreoffice \
-    fonts-liberation \
-    fonts-dejavu-core \
-    fonts-noto-core \
-    fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python packages
@@ -36,3 +24,4 @@ RUN mkdir -p uploads cache data
 EXPOSE 8000
 
 CMD ["python", "run.py", "--host", "0.0.0.0", "--port", "8000"]
+

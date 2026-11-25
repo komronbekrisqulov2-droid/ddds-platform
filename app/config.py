@@ -85,10 +85,13 @@ DEFAULT_ROOMS = [
     }
 ]
 
-# Supported media extensions
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".svg", ".gif"}
-PRESENTATION_EXTENSIONS = {".pptx", ".ppt"}
-DOCUMENT_EXTENSIONS = {".docx", ".doc"}
+# Supported media extensions (Ultra-fast PDF, Images and Videos)
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 PDF_EXTENSIONS = {".pdf"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".ogg", ".mov"}
+ALLOWED_EXTENSIONS = PDF_EXTENSIONS | IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+
+# Maximum upload size (100 MB to prevent DoS / RAM blowouts)
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024
+
 

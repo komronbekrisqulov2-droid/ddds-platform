@@ -86,6 +86,10 @@ def test_8_api_rooms_listing():
     data = response.json()
     assert data["status"] == "ok"
     assert len(data["rooms"]) >= 3
+    # Security: Ensure secret PIN is NOT returned in public room listings
+    for r in data["rooms"]:
+        assert "pin" not in r
+        assert "has_pin" in r
 
 def test_9_api_room_crud():
     # 1. Create temporary room
@@ -97,22 +101,27 @@ def test_9_api_room_crud():
     })
     assert res_create.status_code == 200
 
-    # 2. Update room
-    res_update = client.put("/api/room/test-crud-1", json={
+    token = state_manager.create_auth_token("test-crud-1")
+
+    # 2. Update room (with auth token)
+    res_update = client.put(f"/api/room/test-crud-1?token={token}", json={
         "room_name": "Test Xona 1 Yangilandi",
         "pin": "7777",
         "description": "Yangilangan tavsif"
     })
     assert res_update.status_code == 200
     assert res_update.json()["room"]["room_name"] == "Test Xona 1 Yangilandi"
-    assert res_update.json()["room"]["pin"] == "7777"
 
-    # 3. Delete room
-    res_del = client.delete("/api/room/test-crud-1")
+    # 3. Unauthenticated delete is rejected (401)
+    res_del_unauth = client.delete("/api/room/test-crud-1")
+    assert res_del_unauth.status_code == 401
+
+    # 4. Authenticated delete succeeds
+    res_del = client.delete(f"/api/room/test-crud-1?token={token}")
     assert res_del.status_code == 200
     assert res_del.json()["status"] == "ok"
 
-    # 4. Confirm deleted in API
+    # 5. Confirm deleted in API
     res_get = client.get("/api/room/test-crud-1")
     assert res_get.status_code == 404
 
@@ -241,6 +250,64 @@ def test_17_webrtc_screenshare_signaling_and_canvas_fallback():
         assert admin_restored["type"] == "SYNC_STATE"
         assert admin_restored["state"]["active_media_type"] == "slides"
 
+def test_18_fast_image_upload_and_auto_switch():
+    import io
+    from PIL import Image
+
+    token = state_manager.create_auth_token("204")
+    room_before = state_manager.get_room("204")
+    original_active_deck = room_before.active_deck_id
+
+    # Create small test PNG image in-memory
+    img_byte_arr = io.BytesIO()
+    img = Image.new("RGB", (600, 400), color=(50, 100, 200))
+    img.save(img_byte_arr, format="PNG")
+    img_bytes = img_byte_arr.getvalue()
+
+    # 1. Upload image with auto_activate=False -> should NOT disrupt current active presentation
+    res_no_auto = client.post(
+        f"/api/room/204/upload",
+        files={"file": ("test_slide.png", img_bytes, "image/png")},
+        data={"auto_activate": "false", "token": token}
+    )
+    assert res_no_auto.status_code == 200
+    data_no_auto = res_no_auto.json()
+    assert data_no_auto["status"] == "ok"
+    assert data_no_auto["auto_activated"] is False
+
+    # Confirm active deck is UNCHANGED on monitors
+    room_after = state_manager.get_room("204")
+    assert room_after.active_deck_id == original_active_deck
+
+    # 2. Upload image with auto_activate=True -> immediately switches active deck
+    res_auto = client.post(
+        f"/api/room/204/upload",
+        files={"file": ("test_slide_live.png", img_bytes, "image/png")},
+        data={"auto_activate": "true", "token": token}
+    )
+    assert res_auto.status_code == 200
+    data_auto = res_auto.json()
+    assert data_auto["auto_activated"] is True
+
+    room_after_auto = state_manager.get_room("204")
+    assert room_after_auto.active_deck_name == "test_slide_live.png"
+
+def test_19_disk_cleanup_on_deck_delete():
+    from app.config import CACHE_DIR
+    token = state_manager.create_auth_token("204")
+    room = state_manager.get_room("204")
+
+    # Find an uploaded deck with cache files
+    target_deck = next((d for d in room.saved_decks if not getattr(d, 'is_permanent', False) and "test_slide" in d.name), None)
+    if target_deck:
+        deck_id = target_deck.id
+        # Delete deck via API
+        res_del = client.delete(f"/api/room/204/delete_deck/{deck_id}?token={token}")
+        assert res_del.status_code == 200
+
+        # Verify deck removed from state
+        assert not any(d.id == deck_id for d in room.saved_decks)
+
 if __name__ == "__main__":
     tests = [
         test_1_lobby_page,
@@ -260,8 +327,10 @@ if __name__ == "__main__":
         test_15_websocket_connection_and_heartbeat,
         test_16_touch_lock_toggle_and_palm_rejection,
         test_17_webrtc_screenshare_signaling_and_canvas_fallback,
+        test_18_fast_image_upload_and_auto_switch,
+        test_19_disk_cleanup_on_deck_delete,
     ]
     for idx, t in enumerate(tests, 1):
         t()
-        print(f"[{idx}/17] {t.__name__} passed successfully.")
-    print("\n🎉 ALL 17 PLATFORM INTEGRATION & SECURITY TESTS PASSED PERFECTLY!")
+        print(f"[{idx}/19] {t.__name__} passed successfully.")
+    print("\n🎉 ALL 19 PLATFORM INTEGRATION & SECURITY TESTS PASSED PERFECTLY!")

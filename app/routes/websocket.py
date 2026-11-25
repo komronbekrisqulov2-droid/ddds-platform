@@ -98,7 +98,8 @@ async def room_websocket_endpoint(websocket: WebSocket, room_id: str, client_rol
             COMMAND_ACTIONS = {
                 "CHANGE_SLIDE", "NEXT_SLIDE", "PREV_SLIDE", "SET_DISPLAY_MODE",
                 "SET_MEDIA_TYPE", "TOGGLE_BLACKOUT", "TOGGLE_LOCK", "TOGGLE_TOUCH_LOCK", 
-                "RELOAD_SCREENS", "SET_ZOOM"
+                "RELOAD_SCREENS", "SET_ZOOM", "CLEAR_DRAWINGS", "QUICK_BANNER",
+                "VIDEO_COMMAND", "CANVAS_FALLBACK_FRAME"
             }
             if msg_type in COMMAND_ACTIONS and not is_authenticated:
                 await websocket.send_json({

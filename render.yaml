@@ -7,3 +7,4 @@ services:
     region: frankfurt
     autoDeploy: true
     healthCheckPath: /api/rooms
+
