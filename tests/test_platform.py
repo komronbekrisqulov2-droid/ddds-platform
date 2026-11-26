@@ -14,7 +14,9 @@ def test_1_lobby_page():
     response = client.get("/")
     assert response.status_code == 200
     assert "DDDS Cloud" in response.text
-    assert "204-Auditoriya" in response.text
+    assert "302-Auditoriya" in response.text
+    assert "101-Auditoriya" in response.text
+    assert "Fizika-1" in response.text
 
 def test_2_screen_page():
     # Screen 1
@@ -346,6 +348,20 @@ def test_20_max_10_decks_retention_and_permanent_pin():
     # The permanent example deck is STILL pinned at index 0!
     assert room.saved_decks[0].is_permanent is True
 
+def test_21_room_json_persistence():
+    from app.state_engine import ROOMS_STORE_FILE
+    assert ROOMS_STORE_FILE.exists()
+    import json
+    data = json.loads(ROOMS_STORE_FILE.read_text(encoding="utf-8"))
+    assert isinstance(data, list)
+    room_ids = [r["id"] for r in data]
+    assert "204" in room_ids
+    assert "101" in room_ids
+    assert "fizika-1" in room_ids
+    # Check 204 has custom 302-Auditoriya name
+    r204 = next(r for r in data if r["id"] == "204")
+    assert "302-Auditoriya" in r204["name"]
+
 if __name__ == "__main__":
     tests = [
         test_1_lobby_page,
@@ -368,8 +384,9 @@ if __name__ == "__main__":
         test_18_fast_image_upload_and_auto_switch,
         test_19_disk_cleanup_on_deck_delete,
         test_20_max_10_decks_retention_and_permanent_pin,
+        test_21_room_json_persistence,
     ]
     for idx, t in enumerate(tests, 1):
         t()
-        print(f"[{idx}/20] {t.__name__} passed successfully.")
-    print("\n🎉 ALL 20 PLATFORM INTEGRATION & SECURITY TESTS PASSED PERFECTLY!")
+        print(f"[{idx}/{len(tests)}] {t.__name__} passed successfully.")
+    print(f"\n🎉 ALL {len(tests)} PLATFORM INTEGRATION & SECURITY TESTS PASSED PERFECTLY!")

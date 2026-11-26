@@ -2,10 +2,11 @@ import asyncio
 import time
 import uuid
 import shutil
+import json
 from typing import Dict, Any, List, Optional
 from fastapi import WebSocket
 
-from app.config import DEFAULT_ROOMS, CACHE_DIR, UPLOADS_DIR
+from app.config import DEFAULT_ROOMS, CACHE_DIR, UPLOADS_DIR, DATA_DIR
 from app.models import (
     RoomState, ScreenState, LaserState, DrawingStroke, VideoSyncState,
     DisplayMode, MediaType, ClientRole, ConnectedClient, SlideItem, PresentationDeck
@@ -13,6 +14,8 @@ from app.models import (
 from app.media_processor import (
     get_default_starter_slides, get_whiteboard_permanent_slides, purge_deck_disk_files
 )
+
+ROOMS_STORE_FILE = DATA_DIR / "rooms_store.json"
 
 
 class RoomStateManager:
@@ -30,8 +33,31 @@ class RoomStateManager:
         # Initialize default rooms
         self._init_default_rooms()
 
+    def _save_rooms_to_disk(self):
+        try:
+            data = []
+            for r_id, room in self.rooms.items():
+                data.append({
+                    "id": room.room_id,
+                    "name": room.room_name,
+                    "pin": room.pin,
+                    "description": room.description or ""
+                })
+            ROOMS_STORE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            print(f"[StateManager] Error saving rooms to disk: {e}")
+
     def _init_default_rooms(self):
-        for room_def in DEFAULT_ROOMS:
+        room_defs = DEFAULT_ROOMS
+        if ROOMS_STORE_FILE.exists():
+            try:
+                loaded = json.loads(ROOMS_STORE_FILE.read_text(encoding="utf-8"))
+                if isinstance(loaded, list) and len(loaded) > 0:
+                    room_defs = loaded
+            except Exception as e:
+                print(f"[StateManager] Error reading rooms store: {e}")
+
+        for room_def in room_defs:
             r_id = room_def["id"]
             starter_slides = get_default_starter_slides(r_id, room_def["name"])
             starter_deck = PresentationDeck(
@@ -57,7 +83,7 @@ class RoomStateManager:
                 room_id=r_id,
                 room_name=room_def["name"],
                 pin=room_def["pin"],
-                description=room_def["description"],
+                description=room_def.get("description", ""),
                 version=1,
                 display_mode=DisplayMode.MIRROR,
                 active_media_type=MediaType.SLIDES,
@@ -73,6 +99,8 @@ class RoomStateManager:
             )
             self.active_sockets[r_id] = {}
 
+        self._save_rooms_to_disk()
+
     def get_room(self, room_id: str) -> Optional[RoomState]:
         return self.rooms.get(room_id)
 
@@ -83,6 +111,7 @@ class RoomStateManager:
             room.pin = pin
             room.description = description
             room.updated_at = time.time()
+            self._save_rooms_to_disk()
             return room
 
         starter_slides = get_default_starter_slides(room_id, name)
@@ -124,6 +153,7 @@ class RoomStateManager:
         self.rooms[room_id] = room
         if room_id not in self.active_sockets:
             self.active_sockets[room_id] = {}
+        self._save_rooms_to_disk()
         return room
 
     def create_auth_token(self, room_id: str) -> str:
@@ -319,6 +349,7 @@ class RoomStateManager:
             room.pin = pin
             room.description = description
             room.updated_at = time.time()
+            self._save_rooms_to_disk()
         await self.broadcast_state(room_id, reason="ROOM_METADATA_UPDATED")
         return room
 
@@ -338,6 +369,7 @@ class RoomStateManager:
             if room_id in self.active_sockets:
                 del self.active_sockets[room_id]
             del self.rooms[room_id]
+            self._save_rooms_to_disk()
 
             # Completely purge cache and upload folders from disk
             room_cache = CACHE_DIR / room_id

@@ -437,7 +437,10 @@ async function submitNewRoom() {
 }
 
 // Edit Room Modal Functions
+let currentEditingRoomOriginalPin = '';
+
 function openEditRoomModal(id, name, pin, desc) {
+    currentEditingRoomOriginalPin = pin || '';
     document.getElementById('edit-room-id').value = id;
     document.getElementById('edit-room-name').value = name;
     document.getElementById('edit-room-pin').value = pin;
@@ -462,7 +465,12 @@ async function submitEditRoom() {
         const resp = await fetch(`/api/room/${encodeURIComponent(id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ room_name: name, pin: pin || '1234', description: desc, current_pin: pin })
+            body: JSON.stringify({ 
+                room_name: name, 
+                pin: pin || '1234', 
+                description: desc, 
+                current_pin: currentEditingRoomOriginalPin || pin 
+            })
         });
         const data = await resp.json();
         if (resp.ok) {

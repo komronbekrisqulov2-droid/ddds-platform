@@ -36,6 +36,7 @@ cache/*
 !cache/.gitkeep
 data/*
 !data/.gitkeep
+!data/rooms_store.json
 
 # Temporary & test files
 test_sharp.*

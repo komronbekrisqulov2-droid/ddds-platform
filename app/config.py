@@ -63,13 +63,13 @@ HOST = os.getenv("DDDS_HOST", "0.0.0.0")
 PORT = int(os.getenv("DDDS_PORT", "8000"))
 DEBUG = os.getenv("DDDS_DEBUG", "False").lower() in ("true", "1", "t")
 
-# Multi-tenant Room Defaults
+# Multi-tenant Room Defaults (Standard university auditoriums)
 DEFAULT_ROOMS = [
     {
         "id": "204",
-        "name": "204-Auditoriya (Bosh Bino)",
+        "name": "302-Auditoriya (Bosh Bino)",
         "pin": "2040",
-        "description": "Smart Kengash va Ma'ruzalar zali"
+        "description": "Sun'iy Intelekt Ma'ruzalar zali"
     },
     {
         "id": "101",

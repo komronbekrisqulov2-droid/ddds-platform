@@ -1,0 +1,20 @@
+[
+  {
+    "id": "204",
+    "name": "302-Auditoriya (Bosh Bino)",
+    "pin": "2040",
+    "description": "Sun'iy Intelekt Ma'ruzalar zali"
+  },
+  {
+    "id": "101",
+    "name": "101-Auditoriya (Axborot Texnologiyalari)",
+    "pin": "1010",
+    "description": "Dasturlash va Kiberxavfsizlik markazi"
+  },
+  {
+    "id": "fizika-1",
+    "name": "Fizika-1 Laboratoriyasi",
+    "pin": "7788",
+    "description": "Eksperimental fizika va optika auditoriyasi"
+  }
+]
