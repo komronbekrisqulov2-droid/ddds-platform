@@ -693,6 +693,16 @@ setInterval(() => {
     document.getElementById('live-clock').textContent = d.toTimeString().split(' ')[0];
 }, 1000);
 
+// Fast Slide Switch (Instant Admin Panel Preview Update)
+client.on('fast_slide_switch', ({ screen1, total_slides }) => {
+    if (currentSlides && currentSlides.length > 0 && currentSlides[screen1]) {
+        const imgEl = document.getElementById('live-slide-img');
+        if (imgEl) imgEl.src = currentSlides[screen1].image_url;
+        const numEl = document.getElementById('current-slide-num');
+        if (numEl) numEl.textContent = `${screen1 + 1} / ${Math.max(1, total_slides || currentSlides.length)}`;
+    }
+});
+
 // Authoritative State Sync
 client.on('sync_state', ({ state, version }) => {
     currentRoomState = state;

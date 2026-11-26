@@ -318,7 +318,7 @@ class WebRTCBroadcaster {
             });
             await pc.setLocalDescription(offer);
 
-            // Safe sender bitrate optimization
+            // Safe sender bitrate and latency optimization
             try {
                 const senders = pc.getSenders();
                 const vSender = senders.find(s => s.track && s.track.kind === 'video');
@@ -329,7 +329,9 @@ class WebRTCBroadcaster {
                         if (!params.encodings || params.encodings.length === 0) {
                             params.encodings = [{}];
                         }
-                        params.encodings[0].maxBitrate = 20000000;
+                        // 4 Mbps is ideal for 1080p 60fps clarity without network congestion
+                        params.encodings[0].maxBitrate = 4000000;
+                        params.encodings[0].maxFramerate = 60;
                         vSender.setParameters(params).catch(() => {});
                     }
                 }
@@ -530,6 +532,16 @@ class WebRTCReceiver {
 
         this.peerConnection.ontrack = (event) => {
             console.log(`[WebRTC Receiver] Track received: ${event.track.kind}`, event.track);
+
+            // Zero-latency direct rendering (instructs browser jitter buffer not to queue frames)
+            if (event.receiver) {
+                if ('playoutDelayHint' in event.receiver) {
+                    try { event.receiver.playoutDelayHint = 0; } catch (e) {}
+                }
+                if ('jitterBufferTarget' in event.receiver) {
+                    try { event.receiver.jitterBufferTarget = 0; } catch (e) {}
+                }
+            }
 
             if (event.track.kind === 'video' && this.videoEl) {
                 // Ensure fresh MediaStream with track directly attached

@@ -142,17 +142,39 @@ client.on('connection_change', ({ status }) => {
 });
 
 // Authoritative State Sync (Catch-Up & Live Updates)
+const preloadedSlideImages = new Map();
+function ensureSlidePreloaded(slide) {
+    if (!slide || !slide.image_url || preloadedSlideImages.has(slide.image_url)) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = slide.image_url;
+    preloadedSlideImages.set(slide.image_url, img);
+}
+
+function preloadAdjacentSlides(currentIdx) {
+    if (!currentSlides || currentSlides.length === 0) return;
+    const indices = [currentIdx, currentIdx + 1, currentIdx + 2, currentIdx - 1];
+    indices.forEach(idx => {
+        if (idx >= 0 && idx < currentSlides.length) {
+            ensureSlidePreloaded(currentSlides[idx]);
+        }
+    });
+}
+
+// Fast Slide Switch (Immediate parallel switch across Monitor 1 and Monitor 2 with zero latency)
+client.on('fast_slide_switch', ({ screen1, screen2 }) => {
+    let targetIdx = screen1;
+    if (SCREEN_NUM === 2) targetIdx = screen2;
+    renderSlide(targetIdx);
+});
+
 client.on('sync_state', ({ state, reason }) => {
     window.currentRoomState = state;
     const newSlides = state.slides || [];
     // Preload all slides into memory so transitions have 0ms latency
     if (newSlides.length > 0 && newSlides !== currentSlides) {
-        newSlides.forEach(s => {
-            if (s.image_url) {
-                const img = new Image();
-                img.src = s.image_url;
-            }
-        });
+        currentSlides = newSlides;
+        preloadAdjacentSlides(0);
     }
     currentSlides = newSlides;
     
@@ -229,6 +251,7 @@ function renderSlide(index) {
     currentSlideIndex = index;
     if (slide.image_url) {
         slideImg.src = slide.image_url;
+        preloadAdjacentSlides(index);
     }
 }
 

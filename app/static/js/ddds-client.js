@@ -131,6 +131,11 @@ class DDDSClient {
             return;
         }
 
+        if (type === 'FAST_SLIDE_SWITCH') {
+            this.emit('fast_slide_switch', msg.payload);
+            return;
+        }
+
         if (type === 'LASER_MOVE') {
             this.emit('laser_move', msg.payload);
             return;

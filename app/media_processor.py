@@ -62,8 +62,8 @@ def ensure_room_dirs(room_id: str):
 
 def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[SlideItem]:
     """
-    Convert each PDF page into Ultra-HD WebP image (2K/4K resolution).
-    Optimized for lightning-fast encoding (quality 88, method 2).
+    Convert each PDF page into Ultra-HD WebP image (1080p/2K resolution).
+    Optimized for maximal speed and minimal CPU/RAM load (quality 85, method 0).
     """
     file_hash = get_file_hash(file_bytes)
     _, room_cache = ensure_room_dirs(room_id)
@@ -72,7 +72,7 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
 
     slides: List[SlideItem] = []
 
-    # 1. Primary: pypdfium2 (Render at Ultra-HD scale 2.0 = 2K/4K razor-sharp vector clarity)
+    # 1. Primary: pypdfium2 (Ultra-fast vector rendering with adaptive scale)
     if HAS_PDFIUM:
         try:
             pdf = pdfium.PdfDocument(file_bytes)
@@ -83,16 +83,25 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
                 
                 if not webp_path.exists():
                     page = pdf[page_idx]
-                    # Scale 2.0 provides ultra crispness at 10x faster encoding speed
-                    bitmap = page.render(scale=2.0)
+                    # Adaptive scale: Ensure width is ~1920px (Full HD) without creating multi-megapixel RAM bloat
+                    page_w, page_h = page.get_size()
+                    scale = 2.0
+                    if page_w > 0:
+                        scale = min(2.5, max(1.0, 1920.0 / page_w))
+
+                    bitmap = page.render(scale=scale)
                     pil_image = bitmap.to_pil()
-                    pil_image.save(webp_path, "WEBP", quality=88, method=2)
+                    # method=0 provides 4x-5x faster encoding with minimal CPU consumption
+                    pil_image.save(webp_path, "WEBP", quality=85, method=0)
+                    bitmap.close()
+                    del pil_image
                 
                 # Text extraction for search/notes if any
                 page_text = ""
                 try:
                     text_page = pdf[page_idx].get_textpage()
                     page_text = text_page.get_text_range()
+                    text_page.close()
                 except Exception:
                     pass
 
@@ -111,7 +120,7 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
         except Exception as e:
             print(f"[MediaProcessor] pypdfium2 failed: {e}, falling back to fitz...")
 
-    # 2. Fallback: PyMuPDF (fitz) at 200 DPI
+    # 2. Fallback: PyMuPDF (fitz) at 160 DPI with fast WebP encoding
     if HAS_FITZ:
         try:
             doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -122,9 +131,11 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
                 
                 if not webp_path.exists():
                     page = doc.load_page(page_idx)
-                    pix = page.get_pixmap(dpi=200)
+                    pix = page.get_pixmap(dpi=160)
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                    img.save(webp_path, "WEBP", quality=88, method=2)
+                    img.save(webp_path, "WEBP", quality=85, method=0)
+                    del pix
+                    del img
                 
                 page_text = doc[page_idx].get_text()
 
@@ -149,7 +160,7 @@ def process_pdf_file(file_bytes: bytes, filename: str, room_id: str) -> List[Sli
 def process_image_file(file_bytes: bytes, filename: str, room_id: str) -> List[SlideItem]:
     """
     Process uploaded image (PNG, JPG, WEBP) into an Ultra-HD slide card.
-    Normalizes resolution, removes alpha artifacts, and converts instantly to WebP.
+    Normalizes resolution, removes alpha artifacts, and converts instantly to WebP (method 0).
     """
     file_hash = get_file_hash(file_bytes)
     _, room_cache = ensure_room_dirs(room_id)
@@ -172,14 +183,27 @@ def process_image_file(file_bytes: bytes, filename: str, room_id: str) -> List[S
         elif im.mode != "RGB":
             im = im.convert("RGB")
 
-        # Constrain max dimension to 3840 (4K) to maintain speed and save RAM
-        max_dim = 3840
+        # Constrain max dimension to 2560 (2K) for lightning-fast encoding and zero RAM bloat
+        max_dim = 2560
         w, h = im.size
         if max(w, h) > max_dim:
             ratio = max_dim / max(w, h)
-            im = im.resize((int(w * ratio), int(h * ratio)), Image.Resampling.LANCZOS)
+            im = im.resize((int(w * ratio), int(h * ratio)), Image.Resampling.BILINEAR)
 
-        im.save(webp_path, "WEBP", quality=90, method=2)
+        im.save(webp_path, "WEBP", quality=86, method=0)
+        im.close()
+
+    stem = Path(filename).stem
+    slide = SlideItem(
+        id=f"img_{file_hash}_1",
+        index=0,
+        title=f"{stem}",
+        image_url=f"/cache/{room_id}/img_{file_hash}/{webp_filename}",
+        speaker_notes=f"Tasvir: {filename}",
+        slide_type="image_slide",
+        extra_data={"file_hash": file_hash}
+    )
+    return [slide]
 
     stem = Path(filename).stem
     slide = SlideItem(

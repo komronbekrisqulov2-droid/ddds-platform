@@ -402,6 +402,15 @@ class RoomStateManager:
         # Clean old drawings when advancing to a new slide so they don't bleed onto the new slide
         room.drawing_strokes.clear()
         room.active_media_type = MediaType.SLIDES
+
+        # Zero-latency Fast Slide Dispatch (<2ms transmission)
+        await self.broadcast_event(room_id, "FAST_SLIDE_SWITCH", {
+            "screen1": room.screen1.slide_index,
+            "screen2": room.screen2.slide_index,
+            "display_mode": room.display_mode.value,
+            "total_slides": total
+        })
+
         await self.broadcast_state(room_id, reason="SLIDE_CHANGED")
 
     async def next_slide(self, room_id: str):

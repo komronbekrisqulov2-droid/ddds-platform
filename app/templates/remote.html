@@ -200,6 +200,18 @@ client.on('pong', ({ latency }) => {
     latencyText.textContent = `${latency}ms 🟢`;
 });
 
+// Fast Slide Switch (Instant Remote Display Update)
+client.on('fast_slide_switch', ({ screen1, total_slides }) => {
+    slideNumBadge.textContent = `${screen1 + 1} / ${Math.max(1, total_slides)}`;
+    if (currentRoomState && currentRoomState.slides && currentRoomState.slides[screen1]) {
+        const sl = currentRoomState.slides[screen1];
+        notesBody.textContent = sl.speaker_notes || "Ma'ruzachi eslatmasi kiritilmagan.";
+        if (sl.image_url) {
+            document.getElementById('remote-slide-thumb').src = sl.image_url;
+        }
+    }
+});
+
 // Authoritative State Sync
 client.on('sync_state', ({ state }) => {
     currentRoomState = state;
