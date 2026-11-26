@@ -308,6 +308,44 @@ def test_19_disk_cleanup_on_deck_delete():
         # Verify deck removed from state
         assert not any(d.id == deck_id for d in room.saved_decks)
 
+def test_20_max_10_decks_retention_and_permanent_pin():
+    import io
+    from PIL import Image
+
+    room_id = "101"
+    token = state_manager.create_auth_token(room_id)
+    room = state_manager.get_room(room_id)
+
+    # 1. The permanent whiteboard / example deck MUST always be at index 0
+    assert room.saved_decks[0].is_permanent is True
+    assert "Namuna" in room.saved_decks[0].name or "Oq Doska" in room.saved_decks[0].name
+
+    # Create dummy PNG bytes
+    img_byte_arr = io.BytesIO()
+    img = Image.new("RGB", (200, 200), color=(10, 20, 30))
+    img.save(img_byte_arr, format="PNG")
+    img_bytes = img_byte_arr.getvalue()
+
+    # Upload 11 decks sequentially
+    for i in range(1, 12):
+        res = client.post(
+            f"/api/room/{room_id}/upload",
+            files={"file": (f"deck_num_{i}.png", img_bytes, "image/png")},
+            data={"auto_activate": "false", "token": token}
+        )
+        assert res.status_code == 200
+
+    # Non-permanent decks must be capped at 10
+    non_perm = [d for d in room.saved_decks if not getattr(d, 'is_permanent', False)]
+    assert len(non_perm) == 10
+
+    # The 1st uploaded ("deck_num_1.png") must have been evicted
+    assert not any(d.name == "deck_num_1.png" for d in room.saved_decks)
+    # The 11th uploaded must be present
+    assert any(d.name == "deck_num_11.png" for d in room.saved_decks)
+    # The permanent example deck is STILL pinned at index 0!
+    assert room.saved_decks[0].is_permanent is True
+
 if __name__ == "__main__":
     tests = [
         test_1_lobby_page,
@@ -329,8 +367,9 @@ if __name__ == "__main__":
         test_17_webrtc_screenshare_signaling_and_canvas_fallback,
         test_18_fast_image_upload_and_auto_switch,
         test_19_disk_cleanup_on_deck_delete,
+        test_20_max_10_decks_retention_and_permanent_pin,
     ]
     for idx, t in enumerate(tests, 1):
         t()
-        print(f"[{idx}/19] {t.__name__} passed successfully.")
-    print("\n🎉 ALL 19 PLATFORM INTEGRATION & SECURITY TESTS PASSED PERFECTLY!")
+        print(f"[{idx}/20] {t.__name__} passed successfully.")
+    print("\n🎉 ALL 20 PLATFORM INTEGRATION & SECURITY TESTS PASSED PERFECTLY!")

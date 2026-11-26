@@ -46,7 +46,7 @@ class RoomStateManager:
             wb_slides = get_whiteboard_permanent_slides(r_id)
             whiteboard_deck = PresentationDeck(
                 id="deck_whiteboard_permanent",
-                name="📋 Interaktiv Oq Doska",
+                name="📋 Interaktiv Oq Doska (Namuna)",
                 format="whiteboard",
                 slide_count=len(wb_slides),
                 slides=wb_slides,
@@ -64,7 +64,8 @@ class RoomStateManager:
                 slides=starter_slides,
                 active_deck_name=starter_deck.name,
                 active_deck_id=starter_deck.id,
-                saved_decks=[starter_deck, whiteboard_deck],
+                # Permanent example deck pinned at index 0
+                saved_decks=[whiteboard_deck, starter_deck],
                 screen1=ScreenState(label="1-Smart Monitor (Chap)", slide_index=0),
                 screen2=ScreenState(label="2-Smart Monitor (O'ng)", slide_index=0 if DisplayMode.MIRROR else 1),
                 screen3=ScreenState(label="3-Smart Monitor", slide_index=0),
@@ -97,7 +98,7 @@ class RoomStateManager:
         wb_slides = get_whiteboard_permanent_slides(room_id)
         whiteboard_deck = PresentationDeck(
             id="deck_whiteboard_permanent",
-            name="📋 Interaktiv Oq Doska",
+            name="📋 Interaktiv Oq Doska (Namuna)",
             format="whiteboard",
             slide_count=len(wb_slides),
             slides=wb_slides,
@@ -113,7 +114,8 @@ class RoomStateManager:
             slides=starter_slides,
             active_deck_name=starter_deck.name,
             active_deck_id=starter_deck.id,
-            saved_decks=[starter_deck, whiteboard_deck],
+            # Permanent example deck pinned at index 0
+            saved_decks=[whiteboard_deck, starter_deck],
             screen1=ScreenState(label="1-Smart Monitor (Chap)", slide_index=0),
             screen2=ScreenState(label="2-Smart Monitor (O'ng)", slide_index=0),
             screen3=ScreenState(label="3-Smart Monitor", slide_index=0),
@@ -463,19 +465,23 @@ class RoomStateManager:
             is_permanent=False
         )
 
-        # Enforce memory & disk retention limit: Keep at most 4 uploaded non-permanent decks (+ permanent whiteboard)
+        # Enforce memory & disk retention limit: Keep at most 10 uploaded non-permanent decks (+ permanent example deck)
+        perm_decks = [d for d in room.saved_decks if getattr(d, 'is_permanent', False)]
         non_perm = [d for d in room.saved_decks if not getattr(d, 'is_permanent', False)]
-        while len(non_perm) >= 4:
+
+        while len(non_perm) >= 10:
             oldest = non_perm.pop(0)
-            room.saved_decks = [d for d in room.saved_decks if d.id != oldest.id]
             purge_deck_disk_files(room_id, oldest)
 
         if auto_activate:
             # Mark all other decks inactive
-            for d in room.saved_decks:
+            for d in perm_decks + non_perm:
                 d.is_active = False
 
-            room.saved_decks.append(new_deck)
+            new_deck.is_active = True
+            # Permanent example deck is ALWAYS pinned at index 0
+            room.saved_decks = perm_decks + non_perm + [new_deck]
+
             # Set as currently active
             room.slides = slides
             room.active_deck_name = deck_name
@@ -488,7 +494,8 @@ class RoomStateManager:
         else:
             # Preserve current slide on monitors; just save to portfolio
             new_deck.is_active = False
-            room.saved_decks.append(new_deck)
+            # Permanent example deck is ALWAYS pinned at index 0
+            room.saved_decks = perm_decks + non_perm + [new_deck]
             await self.broadcast_state(room_id, reason="NEW_DECK_SAVED")
 
     async def activate_deck(self, room_id: str, deck_id: str):
