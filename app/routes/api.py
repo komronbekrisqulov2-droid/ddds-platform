@@ -49,6 +49,7 @@ class UpdateRoomRequest(BaseModel):
     room_name: str
     pin: str = "1234"
     description: str = ""
+    current_pin: Optional[str] = None
 
 
 class VerifyPinRequest(BaseModel):
@@ -111,7 +112,23 @@ def get_room_details(room_id: str, request: Request, token: Optional[str] = None
 
 @api_router.put("/room/{room_id}")
 async def update_room_endpoint(room_id: str, req: UpdateRoomRequest, request: Request, token: Optional[str] = None):
-    require_request_auth(room_id, request, token)
+    room = state_manager.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Xona topilmadi")
+
+    # Authorize if valid token OR if supplied PIN matches current room PIN
+    is_authed = verify_request_auth(room_id, request, token)
+    if not is_authed:
+        check_pin = (req.current_pin or req.pin or "").strip()
+        if check_pin and check_pin == room.pin:
+            is_authed = True
+
+    if not is_authed:
+        raise HTTPException(
+            status_code=401,
+            detail="Ushbu amalni bajarish uchun to'g'ri PIN-kod talab qilinadi"
+        )
+
     updated = await state_manager.update_room(
         room_id=room_id,
         name=req.room_name.strip(),
@@ -124,8 +141,21 @@ async def update_room_endpoint(room_id: str, req: UpdateRoomRequest, request: Re
 
 
 @api_router.delete("/room/{room_id}")
-async def delete_room_endpoint(room_id: str, request: Request, token: Optional[str] = None):
-    require_request_auth(room_id, request, token)
+async def delete_room_endpoint(room_id: str, request: Request, token: Optional[str] = None, pin: Optional[str] = None):
+    room = state_manager.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail="Xona topilmadi")
+
+    is_authed = verify_request_auth(room_id, request, token)
+    if not is_authed and pin and pin.strip() == room.pin:
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(
+            status_code=401,
+            detail="Auditoriyani o'chirish uchun to'g'ri PIN-kod talab qilinadi"
+        )
+
     success = await state_manager.delete_room(room_id)
     if not success:
         raise HTTPException(status_code=404, detail="Xona topilmadi")

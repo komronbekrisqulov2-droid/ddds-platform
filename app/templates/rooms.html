@@ -360,10 +360,14 @@
     <div class="modal-box" style="text-align: center;">
         <div style="font-size: 2.5rem; color: #ef4444; margin-bottom: 8px;">⚠️</div>
         <h3 style="margin-bottom: 12px; color: white;">Auditoriyani O'chirish</h3>
-        <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 20px;">
+        <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 16px;">
             Haqiqatan ham <strong id="delete-room-name-label" style="color: white;"></strong> xonasini va uning barcha ma'lumotlarini o'chirib tashlamoqchimisiz?
         </p>
         <input type="hidden" id="delete-room-id">
+        <div style="margin-bottom: 18px;">
+            <label style="font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 6px;">Tasdiqlash uchun xona PIN-kodini kiriting:</label>
+            <input type="text" id="delete-room-pin" maxlength="6" placeholder="PIN-kod..." style="width: 100%; max-width: 220px; padding: 10px; background: #0b0f19; border: 1px solid var(--border-color); border-radius: 6px; color: white; text-align: center; font-size: 1.1rem; letter-spacing: 2px;">
+        </div>
         <div style="display: flex; justify-content: center; gap: 12px;">
             <button class="btn btn-secondary" onclick="closeDeleteRoomModal()">Bekor qilish</button>
             <button class="btn btn-primary" style="background: #dc2626; border-color: #ef4444;" onclick="executeDeleteRoom()">Ha, O'chirish</button>
@@ -455,10 +459,10 @@ async function submitEditRoom() {
     }
 
     try {
-        const resp = await fetch(`/api/room/${id}`, {
+        const resp = await fetch(`/api/room/${encodeURIComponent(id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ room_name: name, pin: pin || '1234', description: desc })
+            body: JSON.stringify({ room_name: name, pin: pin || '1234', description: desc, current_pin: pin })
         });
         const data = await resp.json();
         if (resp.ok) {
@@ -476,22 +480,30 @@ async function submitEditRoom() {
 function confirmDeleteRoom(id, name) {
     document.getElementById('delete-room-id').value = id;
     document.getElementById('delete-room-name-label').textContent = name;
+    const pinInput = document.getElementById('delete-room-pin');
+    if (pinInput) pinInput.value = '';
     document.getElementById('delete-room-modal').style.display = 'flex';
+    if (pinInput) pinInput.focus();
 }
 function closeDeleteRoomModal() {
     document.getElementById('delete-room-modal').style.display = 'none';
 }
 async function executeDeleteRoom() {
     const id = document.getElementById('delete-room-id').value;
+    const pin = document.getElementById('delete-room-pin') ? document.getElementById('delete-room-pin').value.trim() : '';
+    if (!pin) {
+        showToast("O'chirish uchun xona PIN-kodini kiriting!", "error");
+        return;
+    }
     try {
-        const resp = await fetch(`/api/room/${id}`, {
+        const resp = await fetch(`/api/room/${encodeURIComponent(id)}?pin=${encodeURIComponent(pin)}`, {
             method: 'DELETE'
         });
+        const data = await resp.json();
         if (resp.ok) {
-            showToast("Auditoriya o'chirildi! 🗑️", "success");
+            showToast("Auditoriya muvaffaqiyatli o'chirildi! 🗑️", "success");
             setTimeout(() => window.location.reload(), 600);
         } else {
-            const data = await resp.json();
             showToast(data.detail || "O'chirishda xatolik", "error");
         }
     } catch (e) {
