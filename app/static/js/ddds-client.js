@@ -100,7 +100,7 @@ class DDDSClient {
                     timestamp: Date.now() / 1000
                 });
             }
-        }, 2500);
+        }, 5000);
     }
 
     stopHeartbeat() {

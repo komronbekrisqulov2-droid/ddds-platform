@@ -20,7 +20,7 @@ class WebRTCBroadcaster {
         this.fallbackCtx = this.fallbackCanvas.getContext('2d', { alpha: false });
         this.fallbackVideo = null;
         this.fallbackTimer = null;
-        this.fallbackIntervalMs = 100; // ~10 FPS lightweight fallback
+        this.fallbackIntervalMs = 250; // ~4 FPS lightweight standby fallback
 
         this.rtcConfig = {
             iceServers: [
@@ -90,15 +90,15 @@ class WebRTCBroadcaster {
             else if (type === 'WEBRTC_STREAMING_OK') {
                 this.verifiedReceivers.add(fromClient);
                 console.log(`[WebRTC Broadcaster] Screen ${fromClient} confirmed WebRTC rendering.`);
-                // If all active peer connections are rendering WebRTC, reduce fallback to warm standby (1 frame/sec)
-                // This guarantees that if P2P video ever drops over internet/NAT, recovery is instantaneous!
+                // If all active peer connections are rendering WebRTC, stop fallback streaming completely!
+                // This eliminates continuous server CPU & WebSocket bandwidth consumption.
                 if (this.peerConnections.size > 0 && this.verifiedReceivers.size >= this.peerConnections.size) {
-                    this.fallbackIntervalMs = 1200;
-                    this.restartFallbackInterval();
-                    console.log('[WebRTC Broadcaster] All screens confirmed WebRTC. Fallback kept on warm standby (1.2s).');
+                    this.stopFallbackStreamer();
+                    this.needsFallback = false;
+                    console.log('[WebRTC Broadcaster] All screens confirmed WebRTC. Fallback streamer paused (0% server load).');
                 }
             }
-            // Screen reports WebRTC failed, firewalled or stalled -> activate high-speed fallback
+            // Screen reports WebRTC failed, firewalled or stalled -> activate fallback
             else if (type === 'WEBRTC_NEED_FALLBACK') {
                 this.verifiedReceivers.delete(fromClient);
                 this.needsFallback = true;
@@ -170,7 +170,8 @@ class WebRTCBroadcaster {
 
             // Ensure DOM-attached fallback video element exists so Chromium compositor stays active
             this.setupFallbackVideo();
-            this.startFallbackStreamer();
+            // Fallback streamer is kept on standby and only activated if a receiver requests it via WEBRTC_NEED_FALLBACK
+            this.stopFallbackStreamer();
 
             // Set media mode on server to screenshare
             this.client.setMediaType('screenshare');

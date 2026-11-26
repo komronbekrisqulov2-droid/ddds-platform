@@ -2,6 +2,7 @@ import io
 import time
 import uuid
 import json
+import asyncio
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response, Request
@@ -191,19 +192,19 @@ async def upload_lecture_media(
     slides = []
     format_type = "pdf"
 
-    # 1. PDF File Processing (Ultra fast 2K/4K)
+    # 1. PDF File Processing (Ultra fast 2K/4K offloaded to thread pool)
     if ext in PDF_EXTENSIONS:
         format_type = "pdf"
         try:
-            slides = process_pdf_file(content, filename, room_id)
+            slides = await asyncio.to_thread(process_pdf_file, content, filename, room_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"PDF qayta ishlashda xatolik: {e}")
 
-    # 2. Image Processing (PNG, JPG, WEBP)
+    # 2. Image Processing (PNG, JPG, WEBP offloaded to thread pool)
     elif ext in IMAGE_EXTENSIONS:
         format_type = "image"
         try:
-            slides = process_image_file(content, filename, room_id)
+            slides = await asyncio.to_thread(process_image_file, content, filename, room_id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Rasm qayta ishlashda xatolik: {e}")
 

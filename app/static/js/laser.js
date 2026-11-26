@@ -133,14 +133,17 @@ class LaserTouchController {
             this.touchDot.style.top = `${touchY}px`;
         }
 
-        // Throttle transmission using requestAnimationFrame
+        // Smooth micro-throttled transmission using requestAnimationFrame (capped at ~40 FPS to prevent 120Hz packet flood)
         this.pendingCoord = { active, x: normX, y: normY };
         if (!this.rafId) {
             this.rafId = requestAnimationFrame(() => {
-                if (this.pendingCoord && this.onMove) {
+                const now = performance.now();
+                const elapsed = now - (this.lastSendTime || 0);
+                if (elapsed >= 25 && this.pendingCoord && this.onMove) {
                     this.onMove(this.pendingCoord.active, this.pendingCoord.x, this.pendingCoord.y);
+                    this.lastSendTime = now;
+                    this.pendingCoord = null;
                 }
-                this.pendingCoord = null;
                 this.rafId = null;
             });
         }
